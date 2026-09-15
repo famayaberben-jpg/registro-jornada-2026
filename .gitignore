@@ -1,0 +1,1 @@
+# Dependencies\nnode_modules/\n.expo/\ndist/\nnpm-debug.*\n*.jks\n*.p8\n*.p12\n*.key\n*.mobileprovision\n*.orig.*\nweb-build/\n.env\n.env.local\n\n# OS\n.DS_Store\n*.pem\n\n# IDE\n.idea/\n.vscode/\n*.swp\n*.swo\n*~\n\n# Generated files\n*.db\n*.sqlite\n*.sqlite3\n\n# Build\nbuild/\ndist/\n"
