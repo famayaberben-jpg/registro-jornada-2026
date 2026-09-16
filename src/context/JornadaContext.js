@@ -1,82 +1,73 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as db from '../services/DatabaseService';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import {
+  initDatabase,
+  getAllJornadas,
+  addJornada as addJornadaDb,
+  updateJornada as updateJornadaDb,
+  deleteJornadaById,
+} from '../services/DatabaseService';
 
-const JornadaContext = createContext();
+const JornadaContext = createContext(null);
 
-export const JornadaProvider = ({ children }) => {
+export function JornadaProvider({ children }) {
   const [jornadas, setJornadas] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Inicializar y cargar jornadas
+  const refresh = useCallback(async () => {
+    const data = await getAllJornadas();
+    setJornadas(data);
+  }, []);
+
   useEffect(() => {
-    const initAndLoad = async () => {
+    (async () => {
       try {
-        setLoading(true);
-        await db.initDatabase();
-        const data = await db.getAllJornadas();
-        setJornadas(data || []);
+        await initDatabase();
+        await refresh();
       } catch (error) {
-        console.error('Error inicializando:', error);
+        console.error('Error inicializando la base de datos:', error);
       } finally {
         setLoading(false);
       }
-    };
+    })();
+  }, [refresh]);
 
-    initAndLoad();
-  }, []);
+  const addJornada = useCallback(
+    async (fecha, horasTrabajadas) => {
+      await addJornadaDb(fecha, horasTrabajadas);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const addJornada = async (fecha, horasTrabajadas) => {
-    try {
-      await db.insertJornada(fecha, horasTrabajadas);
-      const data = await db.getAllJornadas();
-      setJornadas(data || []);
-    } catch (error) {
-      console.error('Error agregando jornada:', error);
-      throw error;
-    }
-  };
+  const updateJornada = useCallback(
+    async (id, fecha, horasTrabajadas) => {
+      await updateJornadaDb(id, fecha, horasTrabajadas);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const updateJornada = async (id, fecha, horasTrabajadas) => {
-    try {
-      await db.updateJornada(id, fecha, horasTrabajadas);
-      const data = await db.getAllJornadas();
-      setJornadas(data || []);
-    } catch (error) {
-      console.error('Error actualizando jornada:', error);
-      throw error;
-    }
-  };
-
-  const deleteJornada = async (id) => {
-    try {
-      await db.deleteJornada(id);
-      const data = await db.getAllJornadas();
-      setJornadas(data || []);
-    } catch (error) {
-      console.error('Error eliminando jornada:', error);
-      throw error;
-    }
-  };
+  const deleteJornada = useCallback(
+    async (id) => {
+      await deleteJornadaById(id);
+      await refresh();
+    },
+    [refresh]
+  );
 
   return (
     <JornadaContext.Provider
-      value={{
-        jornadas,
-        loading,
-        addJornada,
-        updateJornada,
-        deleteJornada,
-      }}
+      value={{ jornadas, loading, addJornada, updateJornada, deleteJornada, refresh }}
     >
       {children}
     </JornadaContext.Provider>
   );
-};
+}
 
-export const useJornada = () => {
+export function useJornada() {
   const context = useContext(JornadaContext);
   if (!context) {
-    throw new Error('useJornada debe usarse dentro de JornadaProvider');
+    throw new Error('useJornada debe usarse dentro de un JornadaProvider');
   }
   return context;
-};
+}

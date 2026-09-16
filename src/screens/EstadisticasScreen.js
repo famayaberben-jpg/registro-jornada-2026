@@ -1,155 +1,85 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useState, useMemo } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { useJornada } from '../context/JornadaContext';
 import { Card, StatCard } from '../components/CommonComponents';
 import {
-  calculateHoursByYear,
-  getAverageHours,
-  getCurrentMonthYear,
+  calculateAnnualHours,
+  calculateAverageHoursPerJornada,
   calculateHoursByMonth,
+  getMonthlyBreakdown,
+  getCurrentMonthYear,
 } from '../utils/calculators';
 
+const NOMBRES_MES = [
+  'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+  'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
+];
+
 export default function EstadisticasScreen() {
-  const { jornadas, loading } = useJornada();
-  const [selectedYear, setSelectedYear] = useState(
-    new Date().getFullYear()
+  const { jornadas } = useJornada();
+  const { year: currentYear, month: currentMonth } = getCurrentMonthYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+
+  const annualHours = useMemo(
+    () => calculateAnnualHours(jornadas, selectedYear),
+    [jornadas, selectedYear]
   );
-  const { month: currentMonth } = getCurrentMonthYear();
-
-  const horasAño = calculateHoursByYear(jornadas, selectedYear);
-  const horasMes = calculateHoursByMonth(
-    jornadas,
-    selectedYear,
-    currentMonth
+  const monthHours = useMemo(
+    () =>
+      selectedYear === currentYear
+        ? calculateHoursByMonth(jornadas, currentYear, currentMonth)
+        : 0,
+    [jornadas, selectedYear]
   );
-  const promedio = getAverageHours(jornadas);
-  const totalJornadas = jornadas.length;
-
-  const handlePrevYear = () => {
-    setSelectedYear(selectedYear - 1);
-  };
-
-  const handleNextYear = () => {
-    setSelectedYear(selectedYear + 1);
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
+  const average = useMemo(
+    () => calculateAverageHoursPerJornada(jornadas, selectedYear),
+    [jornadas, selectedYear]
+  );
+  const breakdown = useMemo(
+    () => getMonthlyBreakdown(jornadas, selectedYear),
+    [jornadas, selectedYear]
+  );
+  const maxHoras = Math.max(1, ...breakdown.map((b) => b.horas));
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>📊 Estadísticas</Text>
-        <Text style={styles.subtitle}>Análisis de tu desempeño</Text>
+        <TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)}>
+          <Text style={styles.navButton}>‹</Text>
+        </TouchableOpacity>
+        <Text style={styles.yearText}>{selectedYear}</Text>
+        <TouchableOpacity onPress={() => setSelectedYear((y) => y + 1)}>
+          <Text style={styles.navButton}>›</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Selector de año */}
-        <View style={styles.yearSelector}>
-          <TouchableOpacity
-            onPress={handlePrevYear}
-            style={styles.yearButton}
-          >
-            <Text style={styles.yearButtonText}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.yearText}>{selectedYear}</Text>
-          <TouchableOpacity
-            onPress={handleNextYear}
-            style={styles.yearButton}
-          >
-            <Text style={styles.yearButtonText}>›</Text>
-          </TouchableOpacity>
-        </View>
+        <StatCard label={`Horas totales en ${selectedYear}`} value={annualHours.toFixed(1)} unit="horas" />
+        {selectedYear === currentYear && (
+          <StatCard label="Horas este mes" value={monthHours.toFixed(1)} unit="horas" />
+        )}
+        <StatCard label="Promedio por jornada" value={average.toFixed(1)} unit="horas" />
 
-        {/* Tarjetas de estadísticas */}
-        <StatCard
-          label="Total de horas anuales"
-          value={horasAño.toFixed(1)}
-          unit="horas"
-        />
-
-        <StatCard
-          label="Horas este mes"
-          value={horasMes.toFixed(1)}
-          unit="horas"
-        />
-
-        <StatCard
-          label="Promedio por jornada"
-          value={promedio.toFixed(1)}
-          unit="horas"
-        />
-
-        <StatCard
-          label="Total de jornadas"
-          value={totalJornadas}
-          unit="registros"
-        />
-
-        {/* Desglose mensual */}
         <Card>
-          <Text style={styles.sectionTitle}>📅 Desglose Mensual {selectedYear}</Text>
-          {renderMonthlyBreakdown()}
-        </Card>
-
-        {/* Información */}
-        <Card>
-          <Text style={styles.sectionTitle}>💡 Información</Text>
-          <Text style={styles.info}>
-            Horas objetivo mensual: 160h
-          </Text>
-          <Text style={styles.info}>
-            Meta anual: 1,920h
-          </Text>
+          <Text style={styles.sectionTitle}>Desglose mensual</Text>
+          {breakdown.map(({ month, horas }) => (
+            <View key={month} style={styles.barRow}>
+              <Text style={styles.barLabel}>{NOMBRES_MES[month - 1]}</Text>
+              <View style={styles.barTrack}>
+                <View
+                  style={[
+                    styles.barFill,
+                    { width: `${Math.max(2, (horas / maxHoras) * 100)}%` },
+                  ]}
+                />
+              </View>
+              <Text style={styles.barValue}>{horas.toFixed(0)}h</Text>
+            </View>
+          ))}
         </Card>
       </ScrollView>
     </View>
   );
-
-  function renderMonthlyBreakdown() {
-    const months = [
-      'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
-      'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
-    ];
-
-    return (
-      <View>
-        {months.map((month, index) => {
-          const hours = calculateHoursByMonth(jornadas, selectedYear, index + 1);
-          const percentage = Math.min((hours / 160) * 100, 100);
-          return (
-            <View key={index} style={styles.monthRow}>
-              <Text style={styles.monthName}>{month}</Text>
-              <View style={styles.monthBarContainer}>
-                <View
-                  style={[
-                    styles.monthBar,
-                    { 
-                      width: `${percentage}%`,
-                      backgroundColor: percentage >= 100 ? '#22C55E' : '#007AFF'
-                    }
-                  ]}
-                />
-              </View>
-              <Text style={styles.monthHours}>{hours.toFixed(0)}h</Text>
-            </View>
-          );
-        })}
-      </View>
-    );
-  }
 }
 
 const styles = StyleSheet.create({
@@ -159,90 +89,60 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#007AFF',
-    paddingTop: 50,
-    paddingBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: 50,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
+  navButton: {
+    fontSize: 32,
+    color: '#FFF',
+    fontWeight: '300',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#E8F4FF',
+  yearText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFF',
   },
   content: {
     flex: 1,
-    paddingVertical: 16,
-  },
-  yearSelector: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 12,
-  },
-  yearButton: {
-    padding: 8,
-    marginHorizontal: 12,
-  },
-  yearButtonText: {
-    fontSize: 20,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  yearText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    minWidth: 60,
-    textAlign: 'center',
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333333',
+    color: '#333',
     marginBottom: 12,
   },
-  monthRow: {
+  barRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
     gap: 8,
   },
-  monthName: {
+  barLabel: {
+    width: 32,
     fontSize: 12,
-    color: '#666666',
-    width: 30,
-    fontWeight: '500',
+    color: '#666',
   },
-  monthBarContainer: {
+  barTrack: {
     flex: 1,
-    height: 24,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EEF2F7',
     overflow: 'hidden',
   },
-  monthBar: {
+  barFill: {
     height: '100%',
-    borderRadius: 4,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
   },
-  monthHours: {
+  barValue: {
+    width: 36,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#333333',
-    width: 40,
+    color: '#333',
     textAlign: 'right',
-  },
-  info: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 8,
-    lineHeight: 20,
   },
 });
