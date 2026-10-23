@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Registro de Jornada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #F7F5F0;
+    --bg-raised: #FFFFFF;
+    --ink: #23241F;
+    --ink-soft: #6B6A63;
+    --rule: #DAD6CC;
+    --accent: #2B4C5E;
+    --accent-soft: #E4EBEC;
+    --accent-ink: #FFFFFF;
+    --danger: #9C4A34;
+    --danger-soft: #F4E6E1;
+    --focus: #2B4C5E;
+    --shadow: rgba(35, 36, 31, 0.08);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1B1C19;
+      --bg-raised: #232420;
+      --ink: #EDEBE3;
+      --ink-soft: #A3A196;
+      --rule: #38392F;
+      --accent: #7FA6BA;
+      --accent-soft: #2A3A3D;
+      --accent-ink: #10181B;
+      --danger: #D98D74;
+      --danger-soft: #3A2A24;
+      --shadow: rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1B1C19;
+    --bg-raised: #232420;
+    --ink: #EDEBE3;
+    --ink-soft: #A3A196;
+    --rule: #38392F;
+    --accent: #7FA6BA;
+    --accent-soft: #2A3A3D;
+    --accent-ink: #10181B;
+    --danger: #D98D74;
+    --danger-soft: #3A2A24;
+    --shadow: rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body { min-height: 100vh; }
+
+  .shell {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 0 20px 64px;
+  }
+
+  header.top {
+    padding: 32px 0 0;
+  }
+
+  .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 14px;
+  }
+
+  h1 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-weight: 700;
+    font-size: 26px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .year {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    color: var(--ink-soft);
+  }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    margin-top: 18px;
+    border-bottom: 1px solid var(--rule);
+    overflow-x: auto;
+  }
+
+  nav.tabs button {
+    appearance: none;
+    background: none;
+    border: none;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    padding: 10px 14px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+    transition: color 0.15s ease;
+  }
+
+  nav.tabs button:hover { color: var(--ink); }
+
+  nav.tabs button[aria-selected="true"] {
+    color: var(--ink);
+    border-bottom-color: var(--accent);
+    font-weight: 600;
+  }
+
+  nav.tabs button:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  a:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  main { padding-top: 28px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; animation: fade-in 0.2s ease; }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .headline-stat {
+    padding: 20px 0 26px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 26px;
+  }
+
+  .headline-stat .label {
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    text-transform: capitalize;
+  }
+
+  .headline-stat .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 44px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1.15;
+    margin-top: 4px;
+  }
+
+  .headline-stat .value small {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    margin-left: 4px;
+  }
+
+  section.block {
+    margin-bottom: 32px;
+  }
+
+  section.block h2 {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+
+  form.entry {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  .field input {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    padding: 9px 11px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--bg-raised);
+    color: var(--ink);
+    min-width: 0;
+  }
+
+  #f-fecha { width: 152px; }
+  #f-horas { width: 90px; }
+
+  button.primary {
+    appearance: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: none;
+    font-size: 14.5px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button.primary:hover { filter: brightness(1.08); }
+  button.primary:active { filter: brightness(0.95); }
+
+  button.ghost, label.ghost {
+    appearance: none;
+    background: none;
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button.ghost:hover, label.ghost:hover { border-color: var(--ink-soft); }
+
+  .form-msg {
+    font-size: 13px;
+    color: var(--danger);
+    margin-top: 8px;
+    min-height: 16px;
+  }
+
+  ul.ledger {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  ul.ledger li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  ul.ledger li .fecha {
+    flex: 0 0 auto;
+    font-size: 14.5px;
+    text-transform: capitalize;
+  }
+
+  ul.ledger li .fill {
+    flex: 1 1 auto;
+    border-bottom: 1px dotted var(--rule);
+    margin-bottom: 5px;
+    min-width: 12px;
+  }
+
+  ul.ledger li .horas {
+    flex: 0 0 auto;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    color: var(--accent);
+    font-size: 14.5px;
+  }
+
+  ul.ledger li .actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 4px;
+  }
+
+  ul.ledger li .actions button {
+    appearance: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 15px;
+    padding: 4px 6px;
+    color: var(--ink-soft);
+    border-radius: 4px;
+  }
+  ul.ledger li .actions button:hover { background: var(--accent-soft); color: var(--ink); }
+
+  .empty {
+    color: var(--ink-soft);
+    font-size: 14px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .month-nav .current {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 17px;
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+
+  .month-nav button {
+    appearance: none;
+    background: none;
+    border: 1px solid var(--rule);
+    color: var(--ink);
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    font-size: 17px;
+    cursor: pointer;
+    line-height: 1;
+  }
+  .month-nav button:hover { border-color: var(--ink-soft); }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .stat-row .label { font-size: 14px; color: var(--ink-soft); }
+  .stat-row .value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 16px; }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+  }
+  .bar-row .m {
+    width: 30px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+  .bar-row .track {
+    flex: 1 1 auto;
+    height: 9px;
+    background: var(--accent-soft);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .bar-row .fill-bar {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+  }
+  .bar-row .h {
+    width: 40px;
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .export-copy {
+    font-size: 14.5px;
+    color: var(--ink-soft);
+    line-height: 1.6;
+    margin: 0 0 20px;
+    max-width: 46ch;
+  }
+
+  .export-status {
+    font-size: 13.5px;
+    margin-top: 12px;
+    color: var(--ink-soft);
+    min-height: 18px;
+  }
+
+  footer.foot {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 420px) {
+    h1 { font-size: 22px; }
+    .headline-stat .value { font-size: 36px; }
+    #f-fecha { width: 132px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="masthead">
+      <h1>Registro de Jornada</h1>
+      <span class="year" id="header-year">2026</span>
+    </div>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
+      <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
+      <button role="tab" data-tab="estadisticas" aria-selected="false">Estadísticas</button>
+      <button role="tab" data-tab="exportar" aria-selected="false">Exportar</button>
+    </nav>
+  </header>
+
+  <main>
+
+    <!-- INICIO -->
+    <section class="panel active" id="panel-inicio">
+      <div class="headline-stat">
+        <div class="label" id="inicio-mes-label">horas trabajadas — septiembre 2026</div>
+        <div class="value" id="inicio-horas">0.0<small>h</small></div>
+      </div>
+
+      <section class="block">
+        <h2>Añadir jornada</h2>
+        <form class="entry" id="form-add">
+          <div class="field">
+            <label for="f-fecha">Fecha</label>
+            <input type="date" id="f-fecha" required>
+          </div>
+          <div class="field">
+            <label for="f-horas">Horas</label>
+            <input type="number" id="f-horas" step="0.25" min="0" max="24" placeholder="8" required>
+          </div>
+          <button type="submit" class="primary">Guardar</button>
+        </form>
+        <div class="form-msg" id="add-msg"></div>
+      </section>
+
+      <section class="block">
+        <h2>Últimas jornadas</h2>
+        <ul class="ledger" id="inicio-lista"></ul>
+      </section>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section class="panel" id="panel-historial">
+      <div class="month-nav">
+        <button id="hist-prev" aria-label="Mes anterior">‹</button>
+        <span class="current" id="hist-mes"></span>
+        <button id="hist-next" aria-label="Mes siguiente">›</button>
+      </div>
+      <ul class="ledger" id="hist-lista"></ul>
+    </section>
+
+    <!-- ESTADISTICAS -->
+    <section class="panel" id="panel-estadisticas">
+      <div class="month-nav">
+        <button id="est-prev" aria-label="Año anterior">‹</button>
+        <span class="current" id="est-anio"></span>
+        <button id="est-next" aria-label="Año siguiente">›</button>
+      </div>
+
+      <div class="stat-row">
+        <span class="label">Horas totales del año</span>
+        <span class="value" id="est-total">0.0 h</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Promedio por jornada</span>
+        <span class="value" id="est-promedio">0.0 h</span>
+      </div>
+
+      <section class="block" style="margin-top:26px;">
+        <h2>Desglose mensual</h2>
+        <div id="est-barras"></div>
+      </section>
+    </section>
+
+    <!-- EXPORTAR -->
+    <section class="panel" id="panel-exportar">
+      <section class="block">
+        <h2>Exportar a Excel</h2>
+        <p class="export-copy">Descarga todos tus registros en un archivo .xlsx, listo para abrir en Excel, Google Sheets o LibreOffice Calc.</p>
+        <button class="primary" id="btn-exportar">Descargar registro (.xlsx)</button>
+        <div class="export-status" id="export-status"></div>
+      </section>
+
+      <section class="block">
+        <h2>Copia de seguridad (.json)</h2>
+        <p class="export-copy">Descarga una copia de tus datos para guardarla o pasarla a otro dispositivo.</p>
+        <button class="ghost" id="btn-exportar-json">Descargar copia (.json)</button>
+        <div class="export-status" id="export-json-status"></div>
+      </section>
+
+      <section class="block">
+        <h2>Importar desde archivo</h2>
+        <p class="export-copy">Abre tu archivo .json (por ejemplo, desde la app Archivos de tu móvil), copia todo su contenido y pégalo aquí abajo.</p>
+        <textarea id="import-textarea" rows="6" placeholder='Pega aquí el contenido del archivo .json…' style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:10px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--bg-raised);color:var(--ink);resize:vertical;"></textarea>
+        <div style="margin-top:10px;">
+          <button class="primary" id="btn-importar-texto">Importar texto pegado</button>
+        </div>
+        <div class="export-status" id="import-status"></div>
+      </section>
+    </section>
+
+  </main>
+
+  <footer class="foot">Los datos se guardan solo en este navegador.</footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "registro-jornada:v1";
+  var MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  var MESES_CORTOS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+  // ---------- Persistencia ----------
+  function loadJornadas() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveJornadas(list) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch (e) {
+      // almacenamiento no disponible; los datos solo viven en memoria esta sesión
+    }
+  }
+
+  var jornadas = loadJornadas();
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ---------- Utilidades de fecha ----------
+  function todayISO() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, "0");
+    var day = String(d.getDate()).padStart(2, "0");
+    return d.getFullYear() + "-" + m + "-" + day;
+  }
+
+  function parseYM(fecha) {
+    var parts = fecha.split("-").map(Number);
+    return { year: parts[0], month: parts[1] };
+  }
+
+  function formatFechaLarga(fecha) {
+    var parts = fecha.split("-").map(Number);
+    var d = new Date(parts[0], parts[1] - 1, parts[2]);
+    return d.toLocaleDateString("es-ES", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
+  }
+
+  function byMonth(list, year, month) {
+    return list
+      .filter(function (j) { var ym = parseYM(j.fecha); return ym.year === year && ym.month === month; })
+      .sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; });
+  }
+
+  function sumHoras(list) {
+    return list.reduce(function (acc, j) { return acc + Number(j.horas || 0); }, 0);
+  }
+
+  // ---------- Estado de navegación ----------
+  var now = new Date();
+  var state = {
+    histYear: now.getFullYear(),
+    histMonth: now.getMonth() + 1,
+    estYear: now.getFullYear()
+  };
+
+  document.getElementById("header-year").textContent = String(now.getFullYear());
+
+  // ---------- Pestañas ----------
+  var tabs = document.querySelectorAll("nav.tabs button");
+  var panels = {
+    inicio: document.getElementById("panel-inicio"),
+    historial: document.getElementById("panel-historial"),
+    estadisticas: document.getElementById("panel-estadisticas"),
+    exportar: document.getElementById("panel-exportar")
+  };
+
+  tabs.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      tabs.forEach(function (b) { b.setAttribute("aria-selected", "false"); });
+      Object.keys(panels).forEach(function (k) { panels[k].classList.remove("active"); });
+      btn.setAttribute("aria-selected", "true");
+      panels[btn.dataset.tab].classList.add("active");
+      renderAll();
+    });
+  });
+
+  // ---------- Render: Inicio ----------
+  function renderInicio() {
+    var year = now.getFullYear(), month = now.getMonth() + 1;
+    var mensuales = byMonth(jornadas, year, month);
+    var total = sumHoras(mensuales);
+
+    document.getElementById("inicio-mes-label").textContent = "horas trabajadas — " + MESES[month - 1] + " " + year;
+    document.getElementById("inicio-horas").innerHTML = total.toFixed(1) + "<small>h</small>";
+
+    var lista = document.getElementById("inicio-lista");
+    lista.innerHTML = "";
+    var recientes = mensuales.slice(0, 6);
+    if (recientes.length === 0) {
+      lista.innerHTML = '<li class="empty" style="border:none;">No hay jornadas registradas este mes.</li>';
+      return;
+    }
+    recientes.forEach(function (j) { lista.appendChild(ledgerItem(j)); });
+  }
+
+  function ledgerItem(j) {
+    var li = document.createElement("li");
+
+    var fecha = document.createElement("span");
+    fecha.className = "fecha";
+    fecha.textContent = formatFechaLarga(j.fecha);
+
+    var fill = document.createElement("span");
+    fill.className = "fill";
+
+    var horas = document.createElement("span");
+    horas.className = "horas";
+    horas.textContent = Number(j.horas).toFixed(2).replace(/\.?0+$/, "") + " h";
+
+    var actions = document.createElement("span");
+    actions.className = "actions";
+
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.setAttribute("aria-label", "Editar jornada del " + j.fecha);
+    editBtn.textContent = "✎";
+    editBtn.addEventListener("click", function () { startEdit(j); });
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.setAttribute("aria-label", "Eliminar jornada del " + j.fecha);
+    delBtn.textContent = "✕";
+    delBtn.addEventListener("click", function () { removeJornada(j.id); });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    li.appendChild(fecha);
+    li.appendChild(fill);
+    li.appendChild(horas);
+    li.appendChild(actions);
+    return li;
+  }
+
+  var editingId = null;
+
+  function startEdit(j) {
+    editingId = j.id;
+    document.getElementById("f-fecha").value = j.fecha;
+    document.getElementById("f-horas").value = j.horas;
+    document.querySelector('nav.tabs button[data-tab="inicio"]').click();
+    document.getElementById("f-horas").focus();
+    document.querySelector('#form-add button[type="submit"]').textContent = "Actualizar";
+  }
+
+  function removeJornada(id) {
+    jornadas = jornadas.filter(function (j) { return j.id !== id; });
+    saveJornadas(jornadas);
+    renderAll();
+  }
+
+  // ---------- Formulario ----------
+  var form = document.getElementById("form-add");
+  document.getElementById("f-fecha").value = todayISO();
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var msg = document.getElementById("add-msg");
+    msg.textContent = "";
+
+    var fecha = document.getElementById("f-fecha").value;
+    var horas = Number(document.getElementById("f-horas").value);
+
+    if (!fecha) { msg.textContent = "Indica una fecha."; return; }
+    if (!(horas > 0 && horas <= 24)) { msg.textContent = "Introduce unas horas entre 0 y 24."; return; }
+
+    if (editingId) {
+      var idx = jornadas.findIndex(function (j) { return j.id === editingId; });
+      if (idx > -1) jornadas[idx] = { id: editingId, fecha: fecha, horas: horas };
+      editingId = null;
+      document.querySelector('#form-add button[type="submit"]').textContent = "Guardar";
+    } else {
+      jornadas.push({ id: uid(), fecha: fecha, horas: horas });
+    }
+
+    saveJornadas(jornadas);
+    document.getElementById("f-fecha").value = todayISO();
+    document.getElementById("f-horas").value = "";
+    renderAll();
+  });
+
+  // ---------- Render: Historial ----------
+  function renderHistorial() {
+    var nombreMes = new Date(state.histYear, state.histMonth - 1).toLocaleDateString("es-ES", { month: "long", year: "numeric" });
+    document.getElementById("hist-mes").textContent = nombreMes;
+
+    var lista = document.getElementById("hist-lista");
+    lista.innerHTML = "";
+    var filtradas = byMonth(jornadas, state.histYear, state.histMonth);
+
+    if (filtradas.length === 0) {
+      lista.innerHTML = '<li class="empty" style="border:none;">No hay jornadas registradas en ' + nombreMes + '.</li>';
+      return;
+    }
+    filtradas.forEach(function (j) { lista.appendChild(ledgerItem(j)); });
+  }
+
+  document.getElementById("hist-prev").addEventListener("click", function () {
+    state.histMonth--;
+    if (state.histMonth < 1) { state.histMonth = 12; state.histYear--; }
+    renderHistorial();
+  });
+  document.getElementById("hist-next").addEventListener("click", function () {
+    state.histMonth++;
+    if (state.histMonth > 12) { state.histMonth = 1; state.histYear++; }
+    renderHistorial();
+  });
+
+  // ---------- Render: Estadísticas ----------
+  function renderEstadisticas() {
+    document.getElementById("est-anio").textContent = String(state.estYear);
+
+    var delAnio = jornadas.filter(function (j) { return parseYM(j.fecha).year === state.estYear; });
+    var total = sumHoras(delAnio);
+    var promedio = delAnio.length ? total / delAnio.length : 0;
+
+    document.getElementById("est-total").textContent = total.toFixed(1) + " h";
+    document.getElementById("est-promedio").textContent = promedio.toFixed(1) + " h";
+
+    var porMes = [];
+    for (var m = 1; m <= 12; m++) {
+      porMes.push(sumHoras(byMonth(jornadas, state.estYear, m)));
+    }
+    var maxHoras = Math.max.apply(null, porMes.concat([1]));
+
+    var cont = document.getElementById("est-barras");
+    cont.innerHTML = "";
+    porMes.forEach(function (horas, i) {
+      var row = document.createElement("div");
+      row.className = "bar-row";
+
+      var mLabel = document.createElement("span");
+      mLabel.className = "m";
+      mLabel.textContent = MESES_CORTOS[i];
+
+      var track = document.createElement("span");
+      track.className = "track";
+      var fillBar = document.createElement("span");
+      fillBar.className = "fill-bar";
+      fillBar.style.width = Math.max(2, (horas / maxHoras) * 100) + "%";
+      track.appendChild(fillBar);
+
+      var hLabel = document.createElement("span");
+      hLabel.className = "h";
+      hLabel.textContent = horas.toFixed(0) + "h";
+
+      row.appendChild(mLabel);
+      row.appendChild(track);
+      row.appendChild(hLabel);
+      cont.appendChild(row);
+    });
+  }
+
+  document.getElementById("est-prev").addEventListener("click", function () { state.estYear--; renderEstadisticas(); });
+  document.getElementById("est-next").addEventListener("click", function () { state.estYear++; renderEstadisticas(); });
+
+  // ---------- Exportar ----------
+  document.getElementById("btn-exportar").addEventListener("click", async function () {
+    var status = document.getElementById("export-status");
+    status.textContent = "Generando archivo…";
+
+    try {
+      var ordenadas = jornadas.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; });
+      var filas = ordenadas.map(function (j) { return { Fecha: j.fecha, "Horas trabajadas": Number(j.horas) }; });
+
+      var ws = XLSX.utils.json_to_sheet(filas);
+      ws["!cols"] = [{ wch: 14 }, { wch: 18 }];
+      var wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Jornadas");
+      var wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+      var blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+
+      var filename = "registro_jornadas_" + todayISO() + ".xlsx";
+
+      var downloads = null;
+      try { downloads = await claude.use("downloads"); } catch (e) { downloads = null; }
+
+      if (downloads) {
+        try {
+          await downloads.save({ filename: filename, data: blob });
+          status.textContent = "Archivo descargado.";
+        } catch (err) {
+          if (err && err.code === "declined") {
+            status.textContent = "Descarga cancelada.";
+          } else {
+            status.textContent = "No se pudo descargar el archivo.";
+          }
+        }
+      } else {
+        // Sin runtime de artifact (ej. vista previa local): descarga directa del navegador
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        status.textContent = "Archivo descargado.";
+      }
+    } catch (e) {
+      status.textContent = "No se pudo generar el archivo.";
+    }
+  });
+
+  // ---------- Exportar copia JSON ----------
+  document.getElementById("btn-exportar-json").addEventListener("click", async function () {
+    var status = document.getElementById("export-json-status");
+    status.textContent = "Generando archivo…";
+    try {
+      var ordenadas = jornadas.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; });
+      var data = JSON.stringify(ordenadas.map(function (j) { return { fecha: j.fecha, horas: Number(j.horas) }; }), null, 2);
+      var blob = new Blob([data], { type: "application/json" });
+      var filename = "copia_jornadas_" + todayISO() + ".json";
+
+      var downloads = null;
+      try { downloads = await claude.use("downloads"); } catch (e) { downloads = null; }
+
+      if (downloads) {
+        try {
+          await downloads.save({ filename: filename, data: blob });
+          status.textContent = "Copia descargada.";
+        } catch (err) {
+          status.textContent = (err && err.code === "declined") ? "Descarga cancelada." : "No se pudo descargar la copia.";
+        }
+      } else {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        status.textContent = "Copia descargada.";
+      }
+    } catch (e) {
+      status.textContent = "No se pudo generar la copia.";
+    }
+  });
+
+  // ---------- Importar desde texto pegado ----------
+  function normalizeFecha(raw) {
+    if (typeof raw !== "string") return null;
+    var m = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[1] + "-" + m[2] + "-" + m[3];
+    var d = new Date(raw);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  function procesarImportacion(texto) {
+    var status = document.getElementById("import-status");
+    texto = (texto || "").trim();
+
+    if (!texto) {
+      status.textContent = "Pega primero el contenido del archivo .json.";
+      return;
+    }
+
+    var parsed;
+    try {
+      parsed = JSON.parse(texto);
+    } catch (e) {
+      status.textContent = "Ese texto no es un JSON válido. Comprueba que lo has copiado completo.";
+      return;
+    }
+
+    var items = Array.isArray(parsed) ? parsed
+      : (parsed && Array.isArray(parsed.jornadas)) ? parsed.jornadas
+      : null;
+
+    if (!items && parsed && parsed.entries && typeof parsed.entries === "object" && !Array.isArray(parsed.entries)) {
+      items = Object.keys(parsed.entries).map(function (fecha) {
+        return { fecha: fecha, horas: parsed.entries[fecha] };
+      });
+    }
+
+    if (!items) {
+      status.textContent = "El contenido no tiene el formato esperado (una lista de jornadas).";
+      return;
+    }
+
+    var añadidas = 0, actualizadas = 0, omitidas = 0;
+
+    items.forEach(function (item) {
+      if (!item || typeof item !== "object") { omitidas++; return; }
+      var fecha = normalizeFecha(item.fecha);
+      var horasRaw = item.horas !== undefined ? item.horas
+        : item.horasTrabajadas !== undefined ? item.horasTrabajadas
+        : item.horas_trabajadas;
+      var horas = Number(horasRaw);
+
+      if (!fecha || !(horas > 0 && horas <= 24)) { omitidas++; return; }
+
+      var existente = jornadas.find(function (j) { return j.fecha === fecha; });
+      if (existente) {
+        existente.horas = horas;
+        actualizadas++;
+      } else {
+        jornadas.push({ id: uid(), fecha: fecha, horas: horas });
+        añadidas++;
+      }
+    });
+
+    saveJornadas(jornadas);
+    renderAll();
+
+    var partes = [];
+    if (añadidas) partes.push(añadidas + " añadidas");
+    if (actualizadas) partes.push(actualizadas + " actualizadas");
+    if (omitidas) partes.push(omitidas + " omitidas por datos inválidos");
+    status.textContent = partes.length ? partes.join(", ") + "." : "No se importó ninguna jornada.";
+  }
+
+  document.getElementById("btn-importar-texto").addEventListener("click", function () {
+    procesarImportacion(document.getElementById("import-textarea").value);
+  });
+
+  // ---------- Render general ----------
+  function renderAll() {
+    renderInicio();
+    renderHistorial();
+    renderEstadisticas();
+  }
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
