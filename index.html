@@ -20,6 +20,7 @@
     --accent-ink: #FFFFFF;
     --danger: #9C4A34;
     --danger-soft: #F4E6E1;
+    --warn: #8A5A00;
     --focus: #2B4C5E;
     --shadow: rgba(35, 36, 31, 0.08);
     color-scheme: light;
@@ -36,6 +37,7 @@
       --accent-ink: #10181B;
       --danger: #D98D74;
       --danger-soft: #3A2A24;
+      --warn: #E0B25A;
       --shadow: rgba(0, 0, 0, 0.35);
       color-scheme: dark;
     }
@@ -51,6 +53,7 @@
     --accent-ink: #10181B;
     --danger: #D98D74;
     --danger-soft: #3A2A24;
+    --warn: #E0B25A;
     --shadow: rgba(0, 0, 0, 0.35);
     color-scheme: dark;
   }
@@ -256,6 +259,66 @@
     margin-top: 8px;
     min-height: 16px;
   }
+  .form-msg.warn { color: var(--warn); }
+
+  .limit {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  .limit .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .limit .name { font-size: 14px; color: var(--ink-soft); }
+  .limit .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 14.5px;
+    text-align: right;
+  }
+  .limit .note { font-size: 12.5px; color: var(--ink-soft); margin-top: 5px; }
+  .limit .meter {
+    height: 6px;
+    background: var(--accent-soft);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  .limit .meter > span {
+    display: block;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+  }
+  .limit.warn .val { color: var(--warn); }
+  .limit.warn .meter > span { background: var(--warn); }
+  .limit.over .val { color: var(--danger); }
+  .limit.over .meter > span { background: var(--danger); }
+
+  details.inc { border-bottom: 1px solid var(--rule); }
+  details.inc summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    padding: 12px 0;
+    cursor: pointer;
+    list-style: none;
+    font-size: 14px;
+  }
+  details.inc summary::-webkit-details-marker { display: none; }
+  details.inc summary .count { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+  details.inc.over summary .count { color: var(--danger); }
+  details.inc ul {
+    list-style: none;
+    margin: 0 0 12px;
+    padding: 0;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  details.inc li { padding: 4px 0; }
 
   ul.ledger {
     list-style: none;
@@ -443,6 +506,11 @@
       </div>
 
       <section class="block">
+        <h2>Límites de jornada</h2>
+        <div id="limites"></div>
+      </section>
+
+      <section class="block">
         <h2>Añadir jornada</h2>
         <form class="entry" id="form-add">
           <div class="field">
@@ -492,6 +560,11 @@
       </div>
 
       <section class="block" style="margin-top:26px;">
+        <h2>Revisión de límites</h2>
+        <div id="est-limites"></div>
+      </section>
+
+      <section class="block">
         <h2>Desglose mensual</h2>
         <div id="est-barras"></div>
       </section>
@@ -594,6 +667,144 @@
   function sumHoras(list) {
     return list.reduce(function (acc, j) { return acc + Number(j.horas || 0); }, 0);
   }
+
+  // ---- LIMITES:INICIO ----
+  // Límites aplicables: 1764 h/año, 39 h/semana, descanso de 3 días cada 15
+  // o de 2 días por semana, y máximo 8 días seguidos de trabajo.
+  var LIM = { anual: 1764, semanal: 39, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
+  var MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
+  function fmt(n) {
+    return (Math.round(n * 10) / 10).toLocaleString("es-ES", { maximumFractionDigits: 1 });
+  }
+
+  // Los días se miden como número entero de días desde 1970-01-01 (UTC),
+  // para que los cambios de hora no afecten al cálculo.
+  function dayNum(fecha) {
+    var p = fecha.split("-").map(Number);
+    return Math.round(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000);
+  }
+
+  function diaCorto(n) {
+    var d = new Date(n * 86400000);
+    return d.getUTCDate() + " " + MES_ABR[d.getUTCMonth()];
+  }
+
+  // Lunes de la semana a la que pertenece el día n
+  function weekStart(n) {
+    var dow = (n + 4) % 7; // 0 = domingo
+    return n - ((dow + 6) % 7);
+  }
+
+  function mapaDias(list) {
+    var m = {};
+    list.forEach(function (j) {
+      var h = Number(j.horas || 0);
+      if (h > 0) {
+        var n = dayNum(j.fecha);
+        m[n] = (m[n] || 0) + h;
+      }
+    });
+    return m;
+  }
+
+  function horasSemana(m, ws) {
+    var s = 0;
+    for (var i = 0; i < 7; i++) s += m[ws + i] || 0;
+    return s;
+  }
+
+  // Los días sin registro cuentan como descanso
+  function libresSemana(m, ws) {
+    var c = 0;
+    for (var i = 0; i < 7; i++) if (!(m[ws + i] > 0)) c++;
+    return c;
+  }
+
+  function libresQuincena(m, n) {
+    var c = 0;
+    for (var i = 0; i < 15; i++) if (!(m[n - i] > 0)) c++;
+    return c;
+  }
+
+  function rachaEn(m, n) {
+    var a = n, b = n;
+    while (m[a - 1] > 0) a--;
+    while (m[b + 1] > 0) b++;
+    return { ini: a, fin: b, len: b - a + 1 };
+  }
+
+  // Incumple el descanso si no hay 3 libres en los 15 días que terminan en n
+  // NI 2 libres en la semana de n.
+  function sinDescanso(m, n) {
+    return libresQuincena(m, n) < LIM.descansoQuincena &&
+           libresSemana(m, weekStart(n)) < LIM.descansoSemana;
+  }
+
+  function totalAnio(list, year) {
+    var t = 0;
+    list.forEach(function (j) {
+      if (parseInt(j.fecha.slice(0, 4), 10) === year) t += Number(j.horas || 0);
+    });
+    return t;
+  }
+
+  function analizarAnio(list, year) {
+    var m = mapaDias(list);
+    var ini = dayNum(year + "-01-01"), fin = dayNum(year + "-12-31");
+
+    var semanas = [];
+    for (var ws = weekStart(ini); ws <= fin; ws += 7) {
+      var h = horasSemana(m, ws);
+      if (h > LIM.semanal) semanas.push({ ini: ws, horas: h });
+    }
+
+    var rachas = [], vistas = {}, descansos = [], cur = null;
+    for (var n = ini; n <= fin; n++) {
+      if (m[n] > 0) {
+        var r = rachaEn(m, n);
+        if (r.len > LIM.rachaMax && !vistas[r.ini]) { vistas[r.ini] = true; rachas.push(r); }
+      }
+      if (sinDescanso(m, n)) {
+        if (cur && cur.fin === n - 1) cur.fin = n;
+        else { cur = { ini: n, fin: n }; descansos.push(cur); }
+      }
+    }
+
+    // Recorta cada periodo a su primer y último día trabajado
+    descansos = descansos.map(function (p) {
+      var a = p.ini, b = p.fin;
+      while (a <= b && !(m[a] > 0)) a++;
+      while (b >= a && !(m[b] > 0)) b--;
+      return a <= b ? { ini: a, fin: b } : null;
+    }).filter(Boolean);
+
+    return { total: totalAnio(list, year), semanas: semanas, rachas: rachas, descansos: descansos };
+  }
+
+  // Avisos sobre una jornada recién guardada
+  function avisosPara(list, fecha) {
+    var m = mapaDias(list), n = dayNum(fecha), out = [];
+    if (!(m[n] > 0)) return out;
+
+    var ws = weekStart(n), h = horasSemana(m, ws);
+    if (h > LIM.semanal) {
+      out.push("La semana del " + diaCorto(ws) + " suma " + fmt(h) + " h (máximo " + LIM.semanal + " h).");
+    }
+    var tot = totalAnio(list, parseInt(fecha.slice(0, 4), 10));
+    if (tot > LIM.anual) {
+      out.push("Superas el máximo anual: " + fmt(tot) + " h de " + LIM.anual + " h.");
+    }
+    var r = rachaEn(m, n);
+    if (r.len > LIM.rachaMax) {
+      out.push("Llevas " + r.len + " días seguidos trabajados (máximo " + LIM.rachaMax + ").");
+    }
+    if (sinDescanso(m, n)) {
+      out.push("No hay descanso suficiente: ni " + LIM.descansoQuincena + " días libres en 15 días ni " + LIM.descansoSemana + " en la semana.");
+    }
+    return out;
+  }
+  // ---- LIMITES:FIN ----
 
   // ---------- Estado de navegación ----------
   var now = new Date();
@@ -707,6 +918,7 @@
     e.preventDefault();
     var msg = document.getElementById("add-msg");
     msg.textContent = "";
+    msg.className = "form-msg";
 
     var fecha = document.getElementById("f-fecha").value;
     var horas = Number(document.getElementById("f-horas").value);
@@ -727,6 +939,12 @@
     document.getElementById("f-fecha").value = todayISO();
     document.getElementById("f-horas").value = "";
     renderAll();
+
+    var avisos = avisosPara(jornadas, fecha);
+    if (avisos.length) {
+      msg.className = "form-msg warn";
+      msg.textContent = "Guardada, pero ojo: " + avisos.join(" ");
+    }
   });
 
   // ---------- Render: Historial ----------
@@ -979,11 +1197,166 @@
     procesarImportacion(document.getElementById("import-textarea").value);
   });
 
+  // ---------- Render: Límites ----------
+  function estadoHoras(h, max) {
+    return h > max ? "over" : (h >= 0.9 * max ? "warn" : "ok");
+  }
+
+  function limitRow(o) {
+    var div = document.createElement("div");
+    div.className = "limit" + (o.status && o.status !== "ok" ? " " + o.status : "");
+
+    var row = document.createElement("div");
+    row.className = "row";
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = o.name;
+    var val = document.createElement("span");
+    val.className = "val";
+    val.textContent = o.val;
+    row.appendChild(name);
+    row.appendChild(val);
+    div.appendChild(row);
+
+    if (typeof o.pct === "number") {
+      var meter = document.createElement("div");
+      meter.className = "meter";
+      var bar = document.createElement("span");
+      bar.style.width = Math.min(100, Math.max(1, o.pct * 100)) + "%";
+      meter.appendChild(bar);
+      div.appendChild(meter);
+    }
+    if (o.note) {
+      var note = document.createElement("div");
+      note.className = "note";
+      note.textContent = o.note;
+      div.appendChild(note);
+    }
+    return div;
+  }
+
+  function renderLimites() {
+    var cont = document.getElementById("limites");
+    cont.innerHTML = "";
+    var year = now.getFullYear();
+    var hoy = dayNum(todayISO());
+    var m = mapaDias(jornadas);
+
+    // Horas del año
+    var total = totalAnio(jornadas, year);
+    var quedan = LIM.anual - total;
+    cont.appendChild(limitRow({
+      name: "Horas del año " + year,
+      val: fmt(total) + " de " + LIM.anual + " h",
+      pct: total / LIM.anual,
+      status: estadoHoras(total, LIM.anual),
+      note: quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h."
+    }));
+
+    // Semana en curso
+    var ws = weekStart(hoy), h = horasSemana(m, ws);
+    cont.appendChild(limitRow({
+      name: "Semana en curso (lun–dom)",
+      val: fmt(h) + " de " + LIM.semanal + " h",
+      pct: h / LIM.semanal,
+      status: estadoHoras(h, LIM.semanal),
+      note: h <= LIM.semanal ? "Te quedan " + fmt(LIM.semanal - h) + " h esta semana." : "Superas el máximo semanal en " + fmt(h - LIM.semanal) + " h."
+    }));
+
+    // Días seguidos (hasta hoy, o hasta ayer si hoy aún no está registrado)
+    var finRacha = m[hoy] > 0 ? hoy : (m[hoy - 1] > 0 ? hoy - 1 : null);
+    var len = finRacha === null ? 0 : rachaEn(m, finRacha).len;
+    var notaRacha;
+    if (len === 0) notaRacha = "Sin días seguidos trabajados.";
+    else if (len > LIM.rachaMax) notaRacha = "Has superado el máximo: necesitas descansar.";
+    else if (len === LIM.rachaMax) notaRacha = finRacha === hoy ? "Mañana debes descansar." : "Hoy debes descansar.";
+    else notaRacha = "Puedes encadenar " + (LIM.rachaMax - len) + (LIM.rachaMax - len === 1 ? " día más." : " días más.");
+    cont.appendChild(limitRow({
+      name: "Días seguidos trabajados",
+      val: len + " de " + LIM.rachaMax + " días",
+      pct: len / LIM.rachaMax,
+      status: len > LIM.rachaMax ? "over" : (len >= LIM.rachaMax - 1 ? "warn" : "ok"),
+      note: notaRacha
+    }));
+
+    // Descanso
+    var libres15 = libresQuincena(m, hoy);
+    var libresSem = libresSemana(m, ws);
+    var cumple = libres15 >= LIM.descansoQuincena || libresSem >= LIM.descansoSemana;
+    cont.appendChild(limitRow({
+      name: "Descanso",
+      val: libres15 + " libres en 15 días",
+      status: cumple ? "ok" : "over",
+      note: "Se cumple con " + LIM.descansoQuincena + " días libres cada 15 días o " + LIM.descansoSemana + " por semana. Esta semana: " + (7 - libresSem) + " de 7 días trabajados (máximo 5 para tener 2 libres)."
+    }));
+  }
+
+  function incidencias(titulo, items) {
+    var det = document.createElement("details");
+    det.className = "inc" + (items.length ? " over" : "");
+
+    var sum = document.createElement("summary");
+    var t = document.createElement("span");
+    t.textContent = titulo;
+    var c = document.createElement("span");
+    c.className = "count";
+    c.textContent = String(items.length);
+    sum.appendChild(t);
+    sum.appendChild(c);
+    det.appendChild(sum);
+
+    var ul = document.createElement("ul");
+    if (!items.length) items = ["Sin incidencias."];
+    items.forEach(function (txt) {
+      var li = document.createElement("li");
+      li.textContent = txt;
+      ul.appendChild(li);
+    });
+    det.appendChild(ul);
+    return det;
+  }
+
+  function renderEstLimites() {
+    var cont = document.getElementById("est-limites");
+    cont.innerHTML = "";
+    var a = analizarAnio(jornadas, state.estYear);
+    var quedan = LIM.anual - a.total;
+
+    cont.appendChild(limitRow({
+      name: "Horas anuales",
+      val: fmt(a.total) + " de " + LIM.anual + " h",
+      pct: a.total / LIM.anual,
+      status: estadoHoras(a.total, LIM.anual),
+      note: quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h."
+    }));
+
+    cont.appendChild(incidencias(
+      "Semanas con más de " + LIM.semanal + " h",
+      a.semanas.map(function (s) {
+        return "Semana del " + diaCorto(s.ini) + " al " + diaCorto(s.ini + 6) + ": " + fmt(s.horas) + " h (+" + fmt(s.horas - LIM.semanal) + " h)";
+      })
+    ));
+    cont.appendChild(incidencias(
+      "Más de " + LIM.rachaMax + " días seguidos",
+      a.rachas.map(function (r) {
+        return "Del " + diaCorto(r.ini) + " al " + diaCorto(r.fin) + ": " + r.len + " días";
+      })
+    ));
+    cont.appendChild(incidencias(
+      "Sin descanso suficiente",
+      a.descansos.map(function (p) {
+        return "Del " + diaCorto(p.ini) + " al " + diaCorto(p.fin) + ": ni " + LIM.descansoQuincena + " libres en 15 días ni " + LIM.descansoSemana + " por semana";
+      })
+    ));
+  }
+
   // ---------- Render general ----------
   function renderAll() {
     renderInicio();
+    renderLimites();
     renderHistorial();
     renderEstadisticas();
+    renderEstLimites();
   }
 
   renderAll();
