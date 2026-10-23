@@ -636,7 +636,59 @@
     }
   }
 
+  // ---------- Datos base ----------
+  // Copia de seguridad del 23/10/2026. Se carga una sola vez en cada navegador;
+  // a partir de ahí, lo que edites o borres se conserva.
+  var SEED_ID = "copia-2026-10-23";
+  var SEED_KEY = "registro-jornada:base";
+  var SEED = [
+    ["2026-01-09", 8], ["2026-01-13", 7.5], ["2026-01-14", 8], ["2026-01-15", 8], ["2026-01-16", 8], ["2026-01-17", 8],
+    ["2026-01-18", 8], ["2026-01-20", 8], ["2026-01-21", 7.5], ["2026-01-22", 7.5], ["2026-01-24", 8], ["2026-01-25", 8],
+    ["2026-01-27", 8], ["2026-01-28", 7.5], ["2026-01-29", 8], ["2026-01-31", 8], ["2026-02-01", 8], ["2026-02-03", 8],
+    ["2026-02-04", 8], ["2026-02-05", 7], ["2026-02-09", 8], ["2026-02-10", 8], ["2026-02-11", 8], ["2026-02-14", 8],
+    ["2026-02-15", 8], ["2026-02-16", 7], ["2026-02-17", 8], ["2026-02-18", 7.5], ["2026-02-19", 7], ["2026-02-21", 8],
+    ["2026-02-22", 7.5], ["2026-02-23", 8], ["2026-02-24", 8], ["2026-02-25", 8], ["2026-02-26", 8], ["2026-02-27", 8],
+    ["2026-03-02", 8], ["2026-03-03", 8], ["2026-03-04", 8], ["2026-03-05", 8], ["2026-03-07", 8], ["2026-03-08", 7.5],
+    ["2026-03-09", 7.5], ["2026-03-10", 7.5], ["2026-03-11", 7.5], ["2026-03-13", 7.5], ["2026-03-14", 8], ["2026-03-15", 7.5],
+    ["2026-03-16", 7.5], ["2026-03-17", 8], ["2026-03-18", 8], ["2026-03-19", 8], ["2026-03-23", 7.5], ["2026-03-24", 8],
+    ["2026-03-25", 8], ["2026-03-26", 8], ["2026-04-07", 8], ["2026-04-08", 8], ["2026-04-09", 8], ["2026-04-11", 7.5],
+    ["2026-04-12", 7], ["2026-04-14", 8], ["2026-04-15", 8], ["2026-04-16", 8], ["2026-04-17", 7.5], ["2026-04-21", 8],
+    ["2026-04-22", 7.5], ["2026-04-23", 8], ["2026-04-24", 8], ["2026-04-25", 8], ["2026-04-26", 7], ["2026-04-28", 8],
+    ["2026-04-29", 8], ["2026-05-01", 8], ["2026-05-02", 8], ["2026-05-03", 8], ["2026-05-05", 8], ["2026-05-06", 8],
+    ["2026-05-07", 8], ["2026-05-08", 8], ["2026-05-12", 8], ["2026-05-13", 8], ["2026-05-15", 8], ["2026-05-16", 8],
+    ["2026-05-17", 8], ["2026-05-18", 7], ["2026-05-19", 8], ["2026-05-20", 8], ["2026-05-21", 8], ["2026-05-25", 7.5],
+    ["2026-05-26", 8], ["2026-05-27", 8], ["2026-05-28", 8], ["2026-05-29", 8], ["2026-06-01", 7.5], ["2026-06-04", 8],
+    ["2026-06-05", 8], ["2026-06-08", 8], ["2026-06-09", 8], ["2026-06-10", 8], ["2026-06-11", 8], ["2026-06-13", 7],
+    ["2026-06-14", 7], ["2026-06-15", 8], ["2026-06-16", 7.5], ["2026-06-17", 8], ["2026-06-18", 8], ["2026-06-19", 8],
+    ["2026-06-22", 8], ["2026-06-23", 8], ["2026-06-24", 8], ["2026-06-26", 8], ["2026-06-27", 7], ["2026-06-28", 8],
+    ["2026-06-29", 8], ["2026-07-08", 7], ["2026-07-09", 8], ["2026-07-10", 8], ["2026-07-13", 8], ["2026-07-14", 8],
+    ["2026-07-15", 8], ["2026-07-16", 8], ["2026-07-18", 7.5], ["2026-07-19", 7.5], ["2026-07-20", 8], ["2026-07-21", 8],
+    ["2026-07-23", 8], ["2026-07-24", 8], ["2026-07-25", 7.5], ["2026-07-26", 7.5], ["2026-07-27", 8], ["2026-07-29", 8],
+    ["2026-07-30", 8], ["2026-07-31", 8], ["2026-08-12", 8], ["2026-08-13", 8], ["2026-08-14", 7], ["2026-08-17", 8],
+    ["2026-08-18", 7.5], ["2026-08-20", 8], ["2026-08-21", 8], ["2026-08-22", 7.5], ["2026-08-23", 7], ["2026-08-24", 8],
+    ["2026-08-26", 7], ["2026-08-27", 8], ["2026-08-28", 8], ["2026-08-31", 8], ["2026-09-02", 8], ["2026-09-03", 8],
+    ["2026-09-05", 8], ["2026-09-06", 8], ["2026-09-07", 8], ["2026-09-08", 8], ["2026-09-09", 7], ["2026-09-10", 8],
+    ["2026-09-11", 8], ["2026-09-14", 7.5], ["2026-09-15", 7.5], ["2026-09-16", 7.5], ["2026-09-17", 7.5], ["2026-09-18", 7.5],
+    ["2026-09-22", 8], ["2026-09-25", 8], ["2026-09-26", 8], ["2026-09-27", 7.5], ["2026-09-28", 8], ["2026-09-29", 8],
+    ["2026-09-30", 8], ["2026-10-02", 8], ["2026-10-05", 8], ["2026-10-06", 8], ["2026-10-07", 8], ["2026-10-08", 8],
+    ["2026-10-09", 8], ["2026-10-12", 8], ["2026-10-13", 8], ["2026-10-16", 8], ["2026-10-17", 7], ["2026-10-18", 7],
+    ["2026-10-19", 8], ["2026-10-21", 8], ["2026-10-26", 7.5], ["2026-10-27", 8], ["2026-10-28", 8], ["2026-10-30", 8],
+    ["2026-10-31", 7], ["2026-11-01", 7], ["2026-11-02", 8], ["2026-11-03", 8], ["2026-11-04", 8], ["2026-11-05", 8],
+    ["2026-11-10", 8], ["2026-11-11", 8], ["2026-11-12", 8], ["2026-11-13", 8], ["2026-11-16", 8], ["2026-11-17", 8],
+    ["2026-11-18", 8], ["2026-11-19", 8], ["2026-11-21", 7.5], ["2026-11-22", 7], ["2026-11-23", 7.5], ["2026-11-24", 8],
+    ["2026-11-26", 8], ["2026-11-27", 8], ["2026-11-28", 7], ["2026-11-29", 7], ["2026-11-30", 8]
+  ];
+
   var jornadas = loadJornadas();
+
+  (function aplicarBase() {
+    var aplicada = null;
+    try { aplicada = localStorage.getItem(SEED_KEY); } catch (e) {}
+    if (aplicada === SEED_ID) return;
+    jornadas = SEED.map(function (p) { return { id: uid(), fecha: p[0], horas: p[1] }; });
+    saveJornadas(jornadas);
+    try { localStorage.setItem(SEED_KEY, SEED_ID); } catch (e) {}
+  })();
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -672,9 +724,9 @@
   }
 
   // ---- LIMITES:INICIO ----
-  // Límites aplicables: 1764 h/año, 39 h/semana, descanso de 3 días cada 15
+  // Límites aplicables: 1764 h/año, descanso de 3 días cada 15
   // o de 2 días por semana, y máximo 8 días seguidos de trabajo.
-  var LIM = { anual: 1764, semanal: 39, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
+  var LIM = { anual: 1764, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
   var MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
   function fmt(n) {
@@ -709,12 +761,6 @@
       }
     });
     return m;
-  }
-
-  function horasSemana(m, ws) {
-    var s = 0;
-    for (var i = 0; i < 7; i++) s += m[ws + i] || 0;
-    return s;
   }
 
   // Los días sin registro cuentan como descanso
@@ -756,12 +802,6 @@
     var m = mapaDias(list);
     var ini = dayNum(year + "-01-01"), fin = dayNum(year + "-12-31");
 
-    var semanas = [];
-    for (var ws = weekStart(ini); ws <= fin; ws += 7) {
-      var h = horasSemana(m, ws);
-      if (h > LIM.semanal) semanas.push({ ini: ws, horas: h });
-    }
-
     var rachas = [], vistas = {}, descansos = [], cur = null;
     for (var n = ini; n <= fin; n++) {
       if (m[n] > 0) {
@@ -782,7 +822,7 @@
       return a <= b ? { ini: a, fin: b } : null;
     }).filter(Boolean);
 
-    return { total: totalAnio(list, year), semanas: semanas, rachas: rachas, descansos: descansos };
+    return { total: totalAnio(list, year), rachas: rachas, descansos: descansos };
   }
 
   // Avisos sobre una jornada recién guardada
@@ -790,10 +830,6 @@
     var m = mapaDias(list), n = dayNum(fecha), out = [];
     if (!(m[n] > 0)) return out;
 
-    var ws = weekStart(n), h = horasSemana(m, ws);
-    if (h > LIM.semanal) {
-      out.push("La semana del " + diaCorto(ws) + " suma " + fmt(h) + " h (máximo " + LIM.semanal + " h).");
-    }
     var tot = totalAnio(list, parseInt(fecha.slice(0, 4), 10));
     if (tot > LIM.anual) {
       out.push("Superas el máximo anual: " + fmt(tot) + " h de " + LIM.anual + " h.");
@@ -908,6 +944,8 @@
   }
 
   function removeJornada(id) {
+    var j = jornadas.find(function (x) { return x.id === id; });
+    if (j && !window.confirm("¿Eliminar la jornada del " + formatFechaLarga(j.fecha) + "?")) return;
     jornadas = jornadas.filter(function (j) { return j.id !== id; });
     saveJornadas(jornadas);
     renderAll();
@@ -1278,15 +1316,7 @@
       note: notaAnual
     }));
 
-    // Semana en curso
-    var ws = weekStart(hoy), h = horasSemana(m, ws);
-    cont.appendChild(limitRow({
-      name: "Semana en curso (lun–dom)",
-      val: fmt(h) + " de " + LIM.semanal + " h",
-      pct: h / LIM.semanal,
-      status: estadoHoras(h, LIM.semanal),
-      note: h <= LIM.semanal ? "Te quedan " + fmt(LIM.semanal - h) + " h esta semana." : "Superas el máximo semanal en " + fmt(h - LIM.semanal) + " h."
-    }));
+    var ws = weekStart(hoy);
 
     // Días seguidos (hasta hoy, o hasta ayer si hoy aún no está registrado)
     var finRacha = m[hoy] > 0 ? hoy : (m[hoy - 1] > 0 ? hoy - 1 : null);
@@ -1365,12 +1395,6 @@
       note: notaAnual
     }));
 
-    cont.appendChild(incidencias(
-      "Semanas con más de " + LIM.semanal + " h",
-      a.semanas.map(function (s) {
-        return "Semana del " + diaCorto(s.ini) + " al " + diaCorto(s.ini + 6) + ": " + fmt(s.horas) + " h (+" + fmt(s.horas - LIM.semanal) + " h)";
-      })
-    ));
     cont.appendChild(incidencias(
       "Más de " + LIM.rachaMax + " días seguidos",
       a.rachas.map(function (r) {
