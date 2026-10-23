@@ -222,7 +222,7 @@
   #f-fecha { width: 152px; }
   #f-horas { width: 90px; }
 
-  button.primary {
+  button.primary, label.primary {
     appearance: none;
     background: var(--accent);
     color: var(--accent-ink);
@@ -234,8 +234,8 @@
     cursor: pointer;
     font-family: inherit;
   }
-  button.primary:hover { filter: brightness(1.08); }
-  button.primary:active { filter: brightness(0.95); }
+  button.primary:hover, label.primary:hover { filter: brightness(1.08); }
+  button.primary:active, label.primary:active { filter: brightness(0.95); }
 
   button.ghost, label.ghost {
     appearance: none;
@@ -515,7 +515,10 @@
 
       <section class="block">
         <h2>Importar desde archivo</h2>
-        <p class="export-copy">Abre tu archivo .json (por ejemplo, desde la app Archivos de tu móvil), copia todo su contenido y pégalo aquí abajo.</p>
+        <p class="export-copy">Elige tu archivo .json de copia de seguridad para importarlo directamente.</p>
+        <input type="file" id="input-importar" accept="application/json,.json,text/plain" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;">
+        <label class="primary" for="input-importar" style="display:inline-block;cursor:pointer;">Importar copia de seguridad (.json)</label>
+        <p class="export-copy" style="margin-top:22px;">Si el botón no te abre el selector de archivos, pega aquí el contenido del .json:</p>
         <textarea id="import-textarea" rows="6" placeholder='Pega aquí el contenido del archivo .json…' style="width:100%;font-family:'IBM Plex Mono',monospace;font-size:13px;padding:10px 12px;border:1px solid var(--rule);border-radius:4px;background:var(--bg-raised);color:var(--ink);resize:vertical;"></textarea>
         <div style="margin-top:10px;">
           <button class="primary" id="btn-importar-texto">Importar texto pegado</button>
@@ -959,6 +962,18 @@
     if (omitidas) partes.push(omitidas + " omitidas por datos inválidos");
     status.textContent = partes.length ? partes.join(", ") + "." : "No se importó ninguna jornada.";
   }
+
+  document.getElementById("input-importar").addEventListener("change", function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var status = document.getElementById("import-status");
+    status.textContent = "Leyendo archivo…";
+    var reader = new FileReader();
+    reader.onload = function () { procesarImportacion(String(reader.result)); };
+    reader.onerror = function () { status.textContent = "No se pudo leer el archivo."; };
+    reader.readAsText(file);
+    e.target.value = "";
+  });
 
   document.getElementById("btn-importar-texto").addEventListener("click", function () {
     procesarImportacion(document.getElementById("import-textarea").value);
