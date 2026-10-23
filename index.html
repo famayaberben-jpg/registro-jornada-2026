@@ -589,6 +589,9 @@
       <section class="block">
         <h2>Importar desde archivo</h2>
         <p class="export-copy">Elige tu archivo .json de copia de seguridad para importarlo directamente.</p>
+        <label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:0 0 14px;cursor:pointer;">
+          <input type="checkbox" id="import-reemplazar"> Reemplazar los datos actuales por los del archivo
+        </label>
         <input type="file" id="input-importar" accept="application/json,.json,text/plain" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;">
         <label class="primary" for="input-importar" style="display:inline-block;cursor:pointer;">Importar copia de seguridad (.json)</label>
         <p class="export-copy" style="margin-top:22px;">Si el botón no te abre el selector de archivos, pega aquí el contenido del .json:</p>
@@ -1149,6 +1152,10 @@
       return;
     }
 
+    var reemplazar = document.getElementById("import-reemplazar").checked;
+    var previas = jornadas;
+    if (reemplazar) jornadas = [];
+
     var añadidas = 0, actualizadas = 0, omitidas = 0;
 
     items.forEach(function (item) {
@@ -1171,6 +1178,12 @@
       }
     });
 
+    if (reemplazar && añadidas + actualizadas === 0) {
+      jornadas = previas;
+      status.textContent = "El archivo no tiene jornadas válidas. No se ha cambiado nada.";
+      return;
+    }
+
     saveJornadas(jornadas);
     renderAll();
 
@@ -1178,7 +1191,10 @@
     if (añadidas) partes.push(añadidas + " añadidas");
     if (actualizadas) partes.push(actualizadas + " actualizadas");
     if (omitidas) partes.push(omitidas + " omitidas por datos inválidos");
-    status.textContent = partes.length ? partes.join(", ") + "." : "No se importó ninguna jornada.";
+    var anioAct = now.getFullYear();
+    status.textContent =
+      (partes.length ? (reemplazar ? "Datos reemplazados: " : "") + partes.join(", ") + "." : "No se importó ninguna jornada.") +
+      " Total " + anioAct + ": " + fmt(totalAnio(jornadas, anioAct)) + " h.";
   }
 
   document.getElementById("input-importar").addEventListener("change", function (e) {
@@ -1245,12 +1261,21 @@
     // Horas del año
     var total = totalAnio(jornadas, year);
     var quedan = LIM.anual - total;
+    var hoyISO = todayISO();
+    var previstas = 0;
+    jornadas.forEach(function (j) {
+      if (j.fecha > hoyISO && parseYM(j.fecha).year === year) previstas += Number(j.horas || 0);
+    });
+    var notaAnual = quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h.";
+    if (previstas > 0) {
+      notaAnual = "Hechas hasta hoy: " + fmt(total - previstas) + " h. Previstas: " + fmt(previstas) + " h. " + notaAnual;
+    }
     cont.appendChild(limitRow({
       name: "Horas del año " + year,
       val: fmt(total) + " de " + LIM.anual + " h",
       pct: total / LIM.anual,
       status: estadoHoras(total, LIM.anual),
-      note: quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h."
+      note: notaAnual
     }));
 
     // Semana en curso
@@ -1321,13 +1346,23 @@
     cont.innerHTML = "";
     var a = analizarAnio(jornadas, state.estYear);
     var quedan = LIM.anual - a.total;
+    var notaAnual = quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h.";
+    if (state.estYear === now.getFullYear()) {
+      var hoyISO = todayISO(), previstas = 0;
+      jornadas.forEach(function (j) {
+        if (j.fecha > hoyISO && parseYM(j.fecha).year === state.estYear) previstas += Number(j.horas || 0);
+      });
+      if (previstas > 0) {
+        notaAnual = "Hechas hasta hoy: " + fmt(a.total - previstas) + " h. Previstas: " + fmt(previstas) + " h. " + notaAnual;
+      }
+    }
 
     cont.appendChild(limitRow({
       name: "Horas anuales",
       val: fmt(a.total) + " de " + LIM.anual + " h",
       pct: a.total / LIM.anual,
       status: estadoHoras(a.total, LIM.anual),
-      note: quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h."
+      note: notaAnual
     }));
 
     cont.appendChild(incidencias(
