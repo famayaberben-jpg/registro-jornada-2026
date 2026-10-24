@@ -253,6 +253,14 @@
   }
   button.ghost:hover, label.ghost:hover { border-color: var(--ink-soft); }
 
+
+  @media print {
+    body.imp-est header.top, body.imp-est .panel:not(#panel-estadisticas), body.imp-est .month-nav button, body.imp-est #btn-pdf-est { display: none !important; }
+    body.imp-est #panel-estadisticas { display: block !important; }
+    body.imp-est { background: #fff; }
+    #pdf-titulo { display: block !important; }
+  }
+  #pdf-titulo { display: none; font-size: 18px; margin: 0 0 12px; }
   .form-msg {
     font-size: 13px;
     color: var(--danger);
@@ -565,6 +573,7 @@
 
     <!-- ESTADISTICAS -->
     <section class="panel" id="panel-estadisticas">
+      <h1 id="pdf-titulo">Registro de jornada</h1>
       <div class="month-nav">
         <button id="est-prev" aria-label="Año anterior">‹</button>
         <span class="current" id="est-anio"></span>
@@ -593,6 +602,7 @@
         <h2>Desglose mensual</h2>
         <div id="est-barras"></div>
       </section>
+      <button class="ghost" id="btn-pdf-est" style="margin-top:22px;">Descargar PDF de estadísticas</button>
     </section>
 
     <!-- VACACIONES -->
@@ -649,7 +659,7 @@
     <section class="panel" id="panel-exportar">
       <section class="block">
         <h2>Exportar a Excel</h2>
-        <p class="export-copy">Descarga todos tus registros en un archivo .xlsx, listo para abrir en Excel, Google Sheets o LibreOffice Calc.</p>
+        <p class="export-copy">Descarga tus jornadas y vacaciones (disfrutadas y pendientes) en un archivo .xlsx, listo para abrir en Excel, Google Sheets o LibreOffice Calc.</p>
         <button class="primary" id="btn-exportar">Descargar registro (.xlsx)</button>
         <div class="export-status" id="export-status"></div>
       </section>
@@ -1387,6 +1397,15 @@
   document.getElementById("est-prev").addEventListener("click", function () { state.estYear--; renderEstadisticas(); });
   document.getElementById("est-next").addEventListener("click", function () { state.estYear++; renderEstadisticas(); });
 
+  // ---------- PDF de estadísticas (imprimir → guardar como PDF) ----------
+  document.getElementById("btn-pdf-est").addEventListener("click", function () {
+    document.getElementById("pdf-titulo").textContent = "Registro de jornada · Estadísticas " + state.estYear;
+    document.body.classList.add("imp-est");
+    var quitar = function () { document.body.classList.remove("imp-est"); window.removeEventListener("afterprint", quitar); };
+    window.addEventListener("afterprint", quitar);
+    window.print();
+  });
+
   // ---------- Exportar ----------
   document.getElementById("btn-exportar").addEventListener("click", async function () {
     var status = document.getElementById("export-status");
@@ -1400,6 +1419,17 @@
       ws["!cols"] = [{ wch: 14 }, { wch: 18 }];
       var wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Jornadas");
+
+      var hoyN = dayNum(todayISO());
+      var filasVac = vacaciones.slice().sort(function (a, b) { return a.desde < b.desde ? -1 : 1; }).map(function (v) {
+        var tot = dayNum(v.hasta) - dayNum(v.desde) + 1;
+        var disf = Math.max(0, Math.min(dayNum(v.hasta), hoyN) - dayNum(v.desde) + 1);
+        return { Desde: v.desde, Hasta: v.hasta, "Días naturales": tot, "Días disfrutados": Math.min(disf, tot), "Días pendientes": tot - Math.min(disf, tot) };
+      });
+      if (!filasVac.length) filasVac = [{ Desde: "", Hasta: "", "Días naturales": 0, "Días disfrutados": 0, "Días pendientes": 0 }];
+      var wsV = XLSX.utils.json_to_sheet(filasVac);
+      wsV["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, wsV, "Vacaciones");
       var wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       var blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
