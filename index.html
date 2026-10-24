@@ -512,6 +512,7 @@
       <button role="tab" data-tab="inicio" aria-selected="true">Inicio</button>
       <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
       <button role="tab" data-tab="estadisticas" aria-selected="false">Estadísticas</button>
+      <button role="tab" data-tab="vacaciones" aria-selected="false">Vacaciones</button>
       <button role="tab" data-tab="exportar" aria-selected="false">Exportar</button>
     </nav>
   </header>
@@ -594,6 +595,43 @@
       </section>
     </section>
 
+    <!-- VACACIONES -->
+    <section class="panel" id="panel-vacaciones">
+      <div class="month-nav">
+        <button id="vac-prev" aria-label="Año anterior">‹</button>
+        <span class="current" id="vac-anio"></span>
+        <button id="vac-next" aria-label="Año siguiente">›</button>
+      </div>
+
+      <div class="headline-stat">
+        <div class="label" id="vac-label" style="text-transform:none;">días de vacaciones</div>
+        <div class="value" id="vac-total">0<small>días</small></div>
+      </div>
+
+      <section class="block">
+        <h2 id="vac-form-title">Añadir vacaciones</h2>
+        <form class="entry" id="form-vac">
+          <div class="field">
+            <label for="v-desde">Desde</label>
+            <input type="date" id="v-desde" required style="width:152px;">
+          </div>
+          <div class="field">
+            <label for="v-hasta">Hasta</label>
+            <input type="date" id="v-hasta" required style="width:152px;">
+          </div>
+          <button type="submit" class="primary" id="vac-submit">Guardar</button>
+          <button type="button" class="ghost" id="vac-cancel" hidden>Cancelar</button>
+        </form>
+        <div class="form-msg" id="vac-msg"></div>
+        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Se cuentan días naturales, con el primero y el último incluidos.</p>
+      </section>
+
+      <section class="block">
+        <h2>Periodos asignados</h2>
+        <ul class="ledger" id="vac-lista"></ul>
+      </section>
+    </section>
+
     <!-- EXPORTAR -->
     <section class="panel" id="panel-exportar">
       <section class="block">
@@ -605,7 +643,7 @@
 
       <section class="block">
         <h2>Copia de seguridad (.json)</h2>
-        <p class="export-copy">Descarga una copia de tus datos para guardarla o pasarla a otro dispositivo.</p>
+        <p class="export-copy">Descarga una copia de tus jornadas y vacaciones para guardarla o pasarla a otro dispositivo.</p>
         <button class="ghost" id="btn-exportar-json">Descargar copia (.json)</button>
         <div class="export-status" id="export-json-status"></div>
       </section>
@@ -890,7 +928,8 @@
   var state = {
     histYear: now.getFullYear(),
     histMonth: now.getMonth() + 1,
-    estYear: now.getFullYear()
+    estYear: now.getFullYear(),
+    vacYear: now.getFullYear()
   };
 
   document.getElementById("header-year").textContent = String(now.getFullYear());
@@ -901,6 +940,7 @@
     inicio: document.getElementById("panel-inicio"),
     historial: document.getElementById("panel-historial"),
     estadisticas: document.getElementById("panel-estadisticas"),
+    vacaciones: document.getElementById("panel-vacaciones"),
     exportar: document.getElementById("panel-exportar")
   };
 
@@ -910,8 +950,178 @@
       Object.keys(panels).forEach(function (k) { panels[k].classList.remove("active"); });
       btn.setAttribute("aria-selected", "true");
       panels[btn.dataset.tab].classList.add("active");
+      try { btn.scrollIntoView({ block: "nearest", inline: "nearest" }); } catch (e) {}
       renderAll();
     });
+  });
+
+  // ---------- Vacaciones ----------
+  var VAC_KEY = "registro-jornada:vacaciones:v1";
+
+  function loadVac() {
+    try {
+      var raw = localStorage.getItem(VAC_KEY);
+      var parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveVac(list) {
+    try { localStorage.setItem(VAC_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+
+  var vacaciones = loadVac();
+  var vacEditId = null;
+
+  // Días naturales de un periodo que caen dentro de un año (extremos incluidos)
+  function diasEnAnio(v, year) {
+    var a = Math.max(dayNum(v.desde), dayNum(year + "-01-01"));
+    var b = Math.min(dayNum(v.hasta), dayNum(year + "-12-31"));
+    return b >= a ? b - a + 1 : 0;
+  }
+
+  function rangoTexto(v) {
+    var y1 = v.desde.slice(0, 4), y2 = v.hasta.slice(0, 4);
+    var a = diaCorto(dayNum(v.desde)), b = diaCorto(dayNum(v.hasta));
+    if (y1 !== y2) return a + " " + y1 + " – " + b + " " + y2;
+    return v.desde === v.hasta ? a : a + " – " + b;
+  }
+
+  function vacItem(v) {
+    var li = document.createElement("li");
+
+    var fecha = document.createElement("span");
+    fecha.className = "fecha";
+    fecha.style.textTransform = "none";
+    fecha.textContent = rangoTexto(v);
+
+    var fill = document.createElement("span");
+    fill.className = "fill";
+
+    var dias = diasEnAnio(v, state.vacYear);
+    var horas = document.createElement("span");
+    horas.className = "horas";
+    horas.textContent = dias + (dias === 1 ? " día" : " días");
+
+    var actions = document.createElement("span");
+    actions.className = "actions";
+
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.setAttribute("aria-label", "Editar vacaciones " + rangoTexto(v));
+    editBtn.textContent = "✎";
+    editBtn.addEventListener("click", function () { startEditVac(v); });
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.setAttribute("aria-label", "Eliminar vacaciones " + rangoTexto(v));
+    delBtn.textContent = "✕";
+    delBtn.addEventListener("click", function () { removeVac(v.id); });
+
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    li.appendChild(fecha);
+    li.appendChild(fill);
+    li.appendChild(horas);
+    li.appendChild(actions);
+    return li;
+  }
+
+  function resetFormVac() {
+    vacEditId = null;
+    document.getElementById("v-desde").value = "";
+    document.getElementById("v-hasta").value = "";
+    document.getElementById("vac-submit").textContent = "Guardar";
+    document.getElementById("vac-form-title").textContent = "Añadir vacaciones";
+    document.getElementById("vac-cancel").hidden = true;
+  }
+
+  function startEditVac(v) {
+    vacEditId = v.id;
+    document.getElementById("v-desde").value = v.desde;
+    document.getElementById("v-hasta").value = v.hasta;
+    document.getElementById("vac-submit").textContent = "Actualizar";
+    document.getElementById("vac-form-title").textContent = "Editar vacaciones";
+    document.getElementById("vac-cancel").hidden = false;
+    document.getElementById("vac-msg").textContent = "";
+    document.getElementById("v-desde").focus();
+  }
+
+  function removeVac(id) {
+    var v = vacaciones.find(function (x) { return x.id === id; });
+    if (v && !window.confirm("¿Eliminar las vacaciones " + rangoTexto(v) + "?")) return;
+    vacaciones = vacaciones.filter(function (x) { return x.id !== id; });
+    saveVac(vacaciones);
+    if (vacEditId === id) resetFormVac();
+    renderVacaciones();
+  }
+
+  function renderVacaciones() {
+    document.getElementById("vac-anio").textContent = String(state.vacYear);
+
+    var delAnio = vacaciones
+      .filter(function (v) { return diasEnAnio(v, state.vacYear) > 0; })
+      .sort(function (a, b) { return a.desde < b.desde ? -1 : 1; });
+    var total = delAnio.reduce(function (s, v) { return s + diasEnAnio(v, state.vacYear); }, 0);
+
+    document.getElementById("vac-label").textContent = "días de vacaciones en " + state.vacYear;
+    document.getElementById("vac-total").innerHTML = total + "<small>" + (total === 1 ? "día" : "días") + "</small>";
+
+    var lista = document.getElementById("vac-lista");
+    lista.innerHTML = "";
+    if (!delAnio.length) {
+      lista.innerHTML = '<li class="empty" style="border:none;">No hay vacaciones asignadas en ' + state.vacYear + '. Añade el primer periodo con el formulario.</li>';
+      return;
+    }
+    delAnio.forEach(function (v) { lista.appendChild(vacItem(v)); });
+  }
+
+  document.getElementById("vac-prev").addEventListener("click", function () { state.vacYear--; renderVacaciones(); });
+  document.getElementById("vac-next").addEventListener("click", function () { state.vacYear++; renderVacaciones(); });
+
+  // Al elegir la fecha de inicio, propone la misma como fecha final
+  document.getElementById("v-desde").addEventListener("change", function () {
+    var d = document.getElementById("v-desde").value, h = document.getElementById("v-hasta");
+    if (d && (!h.value || h.value < d)) h.value = d;
+  });
+
+  document.getElementById("vac-cancel").addEventListener("click", function () {
+    document.getElementById("vac-msg").textContent = "";
+    resetFormVac();
+  });
+
+  document.getElementById("form-vac").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var msg = document.getElementById("vac-msg");
+    msg.textContent = "";
+
+    var desde = document.getElementById("v-desde").value;
+    var hasta = document.getElementById("v-hasta").value;
+
+    if (!desde || !hasta) { msg.textContent = "Indica la fecha de inicio y la de fin."; return; }
+    if (hasta < desde) { msg.textContent = "La fecha final no puede ser anterior a la inicial."; return; }
+
+    var choque = vacaciones.find(function (o) {
+      return o.id !== vacEditId && !(hasta < o.desde || desde > o.hasta);
+    });
+    if (choque) {
+      msg.textContent = "Ese periodo coincide con otro ya guardado (" + rangoTexto(choque) + ").";
+      return;
+    }
+
+    if (vacEditId) {
+      var idx = vacaciones.findIndex(function (o) { return o.id === vacEditId; });
+      if (idx > -1) vacaciones[idx] = { id: vacEditId, desde: desde, hasta: hasta };
+    } else {
+      vacaciones.push({ id: uid(), desde: desde, hasta: hasta });
+    }
+    saveVac(vacaciones);
+    state.vacYear = parseInt(desde.slice(0, 4), 10);
+    resetFormVac();
+    renderVacaciones();
   });
 
   // ---------- Render: Inicio ----------
@@ -1183,7 +1393,11 @@
     status.textContent = "Generando archivo…";
     try {
       var ordenadas = jornadas.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; });
-      var data = JSON.stringify(ordenadas.map(function (j) { return { fecha: j.fecha, horas: Number(j.horas) }; }), null, 2);
+      var vacOrdenadas = vacaciones.slice().sort(function (a, b) { return a.desde < b.desde ? -1 : 1; });
+      var data = JSON.stringify({
+        jornadas: ordenadas.map(function (j) { return { fecha: j.fecha, horas: Number(j.horas) }; }),
+        vacaciones: vacOrdenadas.map(function (v) { return { desde: v.desde, hasta: v.hasta }; })
+      }, null, 2);
       var blob = new Blob([data], { type: "application/json" });
       var filename = "copia_jornadas_" + todayISO() + ".json";
 
@@ -1287,6 +1501,22 @@
       return;
     }
 
+    // Vacaciones incluidas en la copia (si las hay)
+    var vacNuevas = 0;
+    if (parsed && Array.isArray(parsed.vacaciones)) {
+      if (reemplazar) vacaciones = [];
+      parsed.vacaciones.forEach(function (v) {
+        if (!v) return;
+        var d = normalizeFecha(v.desde), h = normalizeFecha(v.hasta);
+        if (!d || !h || h < d) return;
+        var choca = vacaciones.some(function (o) { return !(h < o.desde || d > o.hasta); });
+        if (choca) return;
+        vacaciones.push({ id: uid(), desde: d, hasta: h });
+        vacNuevas++;
+      });
+      saveVac(vacaciones);
+    }
+
     saveJornadas(jornadas);
     renderAll();
 
@@ -1294,6 +1524,7 @@
     if (añadidas) partes.push(añadidas + " añadidas");
     if (actualizadas) partes.push(actualizadas + " actualizadas");
     if (omitidas) partes.push(omitidas + " omitidas por datos inválidos");
+    if (vacNuevas) partes.push(vacNuevas + (vacNuevas === 1 ? " periodo de vacaciones" : " periodos de vacaciones"));
     var anioAct = now.getFullYear();
     status.textContent =
       (partes.length ? (reemplazar ? "Datos reemplazados: " : "") + partes.join(", ") + "." : "No se importó ninguna jornada.") +
@@ -1495,6 +1726,7 @@
     renderHistorial();
     renderEstadisticas();
     renderEstLimites();
+    renderVacaciones();
   }
 
   renderAll();
