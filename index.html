@@ -608,6 +608,15 @@
         <div class="value" id="vac-total">0<small>días</small></div>
       </div>
 
+      <div class="stat-row">
+        <span class="label">Disfrutadas hasta hoy</span>
+        <span class="value" id="vac-disfrutadas">0 días</span>
+      </div>
+      <div class="stat-row" style="margin-bottom:26px;">
+        <span class="label">Pendientes</span>
+        <span class="value" id="vac-pendientes">0 días</span>
+      </div>
+
       <section class="block">
         <h2 id="vac-form-title">Añadir vacaciones</h2>
         <form class="entry" id="form-vac">
@@ -982,6 +991,15 @@
     return b >= a ? b - a + 1 : 0;
   }
 
+  // Días naturales de un periodo, dentro de un año, que ya han llegado (hasta hoy incluido)
+  function diasHastaHoy(v, year, hoyN) {
+    var a = Math.max(dayNum(v.desde), dayNum(year + "-01-01"));
+    var b = Math.min(dayNum(v.hasta), dayNum(year + "-12-31"), hoyN);
+    return b >= a ? b - a + 1 : 0;
+  }
+
+  function textoDias(n) { return n + (n === 1 ? " día" : " días"); }
+
   function rangoTexto(v) {
     var y1 = v.desde.slice(0, 4), y2 = v.hasta.slice(0, 4);
     var a = diaCorto(dayNum(v.desde)), b = diaCorto(dayNum(v.hasta));
@@ -1066,6 +1084,11 @@
       .filter(function (v) { return diasEnAnio(v, state.vacYear) > 0; })
       .sort(function (a, b) { return a.desde < b.desde ? -1 : 1; });
     var total = delAnio.reduce(function (s, v) { return s + diasEnAnio(v, state.vacYear); }, 0);
+
+    var hoyN = dayNum(todayISO());
+    var disfrutadas = delAnio.reduce(function (s, v) { return s + diasHastaHoy(v, state.vacYear, hoyN); }, 0);
+    document.getElementById("vac-disfrutadas").textContent = textoDias(disfrutadas);
+    document.getElementById("vac-pendientes").textContent = textoDias(total - disfrutadas);
 
     document.getElementById("vac-label").textContent = "días de vacaciones en " + state.vacYear;
     document.getElementById("vac-total").innerHTML = total + "<small>" + (total === 1 ? "día" : "días") + "</small>";
