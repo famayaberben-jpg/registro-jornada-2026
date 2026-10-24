@@ -748,9 +748,9 @@
   }
 
   // ---- LIMITES:INICIO ----
-  // Límites aplicables: 1764 h/año, descanso de 3 días cada 15
+  // Límites aplicables: 1764 h/año, 48 h/semana, descanso de 3 días cada 15
   // o de 2 días por semana, y máximo 8 días seguidos de trabajo.
-  var LIM = { anual: 1764, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
+  var LIM = { anual: 1764, semanal: 48, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
   var MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
   function fmt(n) {
@@ -785,6 +785,12 @@
       }
     });
     return m;
+  }
+
+  function horasSemana(m, ws) {
+    var s = 0;
+    for (var i = 0; i < 7; i++) s += m[ws + i] || 0;
+    return s;
   }
 
   // Los días sin registro cuentan como descanso
@@ -826,6 +832,12 @@
     var m = mapaDias(list);
     var ini = dayNum(year + "-01-01"), fin = dayNum(year + "-12-31");
 
+    var semanas = [];
+    for (var ws = weekStart(ini); ws <= fin; ws += 7) {
+      var h = horasSemana(m, ws);
+      if (h > LIM.semanal) semanas.push({ ini: ws, horas: h });
+    }
+
     var rachas = [], vistas = {}, descansos = [], cur = null;
     for (var n = ini; n <= fin; n++) {
       if (m[n] > 0) {
@@ -846,7 +858,7 @@
       return a <= b ? { ini: a, fin: b } : null;
     }).filter(Boolean);
 
-    return { total: totalAnio(list, year), rachas: rachas, descansos: descansos };
+    return { total: totalAnio(list, year), semanas: semanas, rachas: rachas, descansos: descansos };
   }
 
   // Avisos sobre una jornada recién guardada
@@ -854,6 +866,10 @@
     var m = mapaDias(list), n = dayNum(fecha), out = [];
     if (!(m[n] > 0)) return out;
 
+    var wsN = weekStart(n), hSem = horasSemana(m, wsN);
+    if (hSem > LIM.semanal) {
+      out.push("La semana del " + diaCorto(wsN) + " suma " + fmt(hSem) + " h (máximo " + LIM.semanal + " h).");
+    }
     var tot = totalAnio(list, parseInt(fecha.slice(0, 4), 10));
     if (tot > LIM.anual) {
       out.push("Superas el máximo anual: " + fmt(tot) + " h de " + LIM.anual + " h.");
@@ -1365,7 +1381,15 @@
       note: notaAnual
     }));
 
-    var ws = weekStart(hoy);
+    // Semana en curso
+    var ws = weekStart(hoy), hSemana = horasSemana(m, ws);
+    cont.appendChild(limitRow({
+      name: "Semana en curso (lun–dom)",
+      val: fmt(hSemana) + " de " + LIM.semanal + " h",
+      pct: hSemana / LIM.semanal,
+      status: estadoHoras(hSemana, LIM.semanal),
+      note: hSemana <= LIM.semanal ? "Te quedan " + fmt(LIM.semanal - hSemana) + " h esta semana." : "Superas el máximo semanal en " + fmt(hSemana - LIM.semanal) + " h."
+    }));
 
     // Días seguidos (hasta hoy, o hasta ayer si hoy aún no está registrado)
     var finRacha = m[hoy] > 0 ? hoy : (m[hoy - 1] > 0 ? hoy - 1 : null);
@@ -1444,6 +1468,12 @@
       note: notaAnual
     }));
 
+    cont.appendChild(incidencias(
+      "Semanas con más de " + LIM.semanal + " h",
+      a.semanas.map(function (s) {
+        return "Semana del " + diaCorto(s.ini) + " al " + diaCorto(s.ini + 6) + ": " + fmt(s.horas) + " h (+" + fmt(s.horas - LIM.semanal) + " h)";
+      })
+    ));
     cont.appendChild(incidencias(
       "Más de " + LIM.rachaMax + " días seguidos",
       a.rachas.map(function (r) {
