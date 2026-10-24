@@ -438,18 +438,38 @@
     overflow: hidden;
   }
   .bar-row .fill-bar {
+    display: block;
     height: 100%;
     background: var(--accent);
     border-radius: 3px;
   }
   .bar-row .h {
-    width: 40px;
+    width: 56px;
     text-align: right;
     font-family: 'IBM Plex Mono', monospace;
     font-size: 12px;
     color: var(--ink-soft);
     flex: 0 0 auto;
   }
+  .bar-row .d {
+    width: 34px;
+    text-align: right;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    flex: 0 0 auto;
+  }
+  .bar-row.bar-head { margin-bottom: 6px; }
+  .bar-row.bar-head .h,
+  .bar-row.bar-head .d { color: var(--ink-soft); font-family: 'IBM Plex Sans', sans-serif; }
+  .bar-row.bar-total {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule);
+  }
+  .bar-row.bar-total .m,
+  .bar-row.bar-total .h,
+  .bar-row.bar-total .d { font-size: 13px; font-weight: 600; color: var(--ink); }
 
   .export-copy {
     font-size: 14.5px;
@@ -553,6 +573,10 @@
       <div class="stat-row">
         <span class="label">Horas totales del año</span>
         <span class="value" id="est-total">0.0 h</span>
+      </div>
+      <div class="stat-row">
+        <span class="label">Días trabajados del año</span>
+        <span class="value" id="est-dias">0</span>
       </div>
       <div class="stat-row">
         <span class="label">Promedio por jornada</span>
@@ -1026,38 +1050,63 @@
     document.getElementById("est-total").textContent = total.toFixed(1) + " h";
     document.getElementById("est-promedio").textContent = promedio.toFixed(1) + " h";
 
-    var porMes = [];
+    // Días trabajados: fechas distintas con horas registradas
+    var fechasAnio = {};
+    delAnio.forEach(function (j) { if (Number(j.horas) > 0) fechasAnio[j.fecha] = true; });
+    var diasAnio = Object.keys(fechasAnio).length;
+    document.getElementById("est-dias").textContent = String(diasAnio);
+
+    var porMes = [], diasMes = [];
     for (var m = 1; m <= 12; m++) {
-      porMes.push(sumHoras(byMonth(jornadas, state.estYear, m)));
+      var delMes = byMonth(jornadas, state.estYear, m);
+      porMes.push(sumHoras(delMes));
+      var distintas = {};
+      delMes.forEach(function (j) { if (Number(j.horas) > 0) distintas[j.fecha] = true; });
+      diasMes.push(Object.keys(distintas).length);
     }
     var maxHoras = Math.max.apply(null, porMes.concat([1]));
 
-    var cont = document.getElementById("est-barras");
-    cont.innerHTML = "";
-    porMes.forEach(function (horas, i) {
+    function filaMes(clase, mTxt, hTxt, dTxt, ancho) {
       var row = document.createElement("div");
-      row.className = "bar-row";
+      row.className = "bar-row" + (clase ? " " + clase : "");
 
       var mLabel = document.createElement("span");
       mLabel.className = "m";
-      mLabel.textContent = MESES_CORTOS[i];
+      mLabel.textContent = mTxt;
 
       var track = document.createElement("span");
       track.className = "track";
-      var fillBar = document.createElement("span");
-      fillBar.className = "fill-bar";
-      fillBar.style.width = Math.max(2, (horas / maxHoras) * 100) + "%";
-      track.appendChild(fillBar);
+      if (typeof ancho === "number") {
+        var fillBar = document.createElement("span");
+        fillBar.className = "fill-bar";
+        fillBar.style.width = ancho + "%";
+        track.appendChild(fillBar);
+      } else {
+        track.style.background = "none";
+      }
 
       var hLabel = document.createElement("span");
       hLabel.className = "h";
-      hLabel.textContent = horas.toFixed(0) + "h";
+      hLabel.textContent = hTxt;
+
+      var dLabel = document.createElement("span");
+      dLabel.className = "d";
+      dLabel.textContent = dTxt;
 
       row.appendChild(mLabel);
       row.appendChild(track);
       row.appendChild(hLabel);
-      cont.appendChild(row);
+      row.appendChild(dLabel);
+      return row;
+    }
+
+    var cont = document.getElementById("est-barras");
+    cont.innerHTML = "";
+    cont.appendChild(filaMes("bar-head", "", "horas", "días"));
+    porMes.forEach(function (horas, i) {
+      cont.appendChild(filaMes("", MESES_CORTOS[i], fmt(horas), String(diasMes[i]), Math.max(2, (horas / maxHoras) * 100)));
     });
+    cont.appendChild(filaMes("bar-total", "Año", fmt(total), String(diasAnio)));
   }
 
   document.getElementById("est-prev").addEventListener("click", function () { state.estYear--; renderEstadisticas(); });
