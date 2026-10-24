@@ -612,9 +612,13 @@
         <span class="label">Disfrutadas hasta hoy</span>
         <span class="value" id="vac-disfrutadas">0 días</span>
       </div>
-      <div class="stat-row" style="margin-bottom:26px;">
-        <span class="label">Pendientes</span>
+      <div class="stat-row">
+        <span class="label">Pendientes de disfrutar</span>
         <span class="value" id="vac-pendientes">0 días</span>
+      </div>
+      <div class="stat-row" style="margin-bottom:26px;">
+        <span class="label" id="vac-sinasignar-label">Sin asignar</span>
+        <span class="value" id="vac-sinasignar">0 días</span>
       </div>
 
       <section class="block">
@@ -632,7 +636,7 @@
           <button type="button" class="ghost" id="vac-cancel" hidden>Cancelar</button>
         </form>
         <div class="form-msg" id="vac-msg"></div>
-        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Se cuentan días naturales, con el primero y el último incluidos.</p>
+        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Se cuentan días naturales, con el primero y el último incluidos. Por convenio corresponden 32 días al año.</p>
       </section>
 
       <section class="block">
@@ -797,7 +801,7 @@
   // ---- LIMITES:INICIO ----
   // Límites aplicables: 1764 h/año, 48 h/semana, descanso de 3 días cada 15
   // o de 2 días por semana, y máximo 8 días seguidos de trabajo.
-  var LIM = { anual: 1764, semanal: 48, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8 };
+  var LIM = { anual: 1764, semanal: 48, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8, vacaciones: 32 };
   var MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
   function fmt(n) {
@@ -1090,8 +1094,16 @@
     document.getElementById("vac-disfrutadas").textContent = textoDias(disfrutadas);
     document.getElementById("vac-pendientes").textContent = textoDias(total - disfrutadas);
 
-    document.getElementById("vac-label").textContent = "días de vacaciones en " + state.vacYear;
-    document.getElementById("vac-total").innerHTML = total + "<small>" + (total === 1 ? "día" : "días") + "</small>";
+    var restoConvenio = LIM.vacaciones - total;
+    var elTotal = document.getElementById("vac-total");
+    document.getElementById("vac-label").textContent = "vacaciones asignadas en " + state.vacYear;
+    elTotal.innerHTML = total + "<small>de " + LIM.vacaciones + " días</small>";
+    elTotal.style.color = restoConvenio < 0 ? "var(--danger)" : "";
+
+    var sinAsignar = document.getElementById("vac-sinasignar");
+    document.getElementById("vac-sinasignar-label").textContent = restoConvenio < 0 ? "Por encima del convenio" : "Sin asignar";
+    sinAsignar.textContent = textoDias(Math.abs(restoConvenio));
+    sinAsignar.style.color = restoConvenio < 0 ? "var(--danger)" : "";
 
     var lista = document.getElementById("vac-lista");
     lista.innerHTML = "";
@@ -1120,6 +1132,7 @@
     e.preventDefault();
     var msg = document.getElementById("vac-msg");
     msg.textContent = "";
+    msg.className = "form-msg";
 
     var desde = document.getElementById("v-desde").value;
     var hasta = document.getElementById("v-hasta").value;
@@ -1145,6 +1158,19 @@
     state.vacYear = parseInt(desde.slice(0, 4), 10);
     resetFormVac();
     renderVacaciones();
+
+    // Aviso si algún año afectado supera los días del convenio
+    var avisos = [];
+    for (var y = parseInt(desde.slice(0, 4), 10); y <= parseInt(hasta.slice(0, 4), 10); y++) {
+      var totalY = vacaciones.reduce(function (s, v) { return s + diasEnAnio(v, y); }, 0);
+      if (totalY > LIM.vacaciones) {
+        avisos.push("en " + y + " llevas " + totalY + " días (convenio: " + LIM.vacaciones + ")");
+      }
+    }
+    if (avisos.length) {
+      msg.className = "form-msg warn";
+      msg.textContent = "Guardado, pero ojo: " + avisos.join("; ") + ".";
+    }
   });
 
   // ---------- Render: Inicio ----------
