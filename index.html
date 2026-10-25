@@ -521,6 +521,7 @@
       <button role="tab" data-tab="historial" aria-selected="false">Historial</button>
       <button role="tab" data-tab="estadisticas" aria-selected="false">Estadísticas</button>
       <button role="tab" data-tab="vacaciones" aria-selected="false">Vacaciones</button>
+      <button role="tab" data-tab="medicas" aria-selected="false">Médicas</button>
       <button role="tab" data-tab="exportar" aria-selected="false">Exportar</button>
     </nav>
   </header>
@@ -655,18 +656,68 @@
       </section>
     </section>
 
+    <!-- HORAS MÉDICAS -->
+    <section class="panel" id="panel-medicas">
+      <div class="month-nav">
+        <button id="med-prev" aria-label="Año anterior">‹</button>
+        <span class="current" id="med-anio"></span>
+        <button id="med-next" aria-label="Año siguiente">›</button>
+      </div>
+
+      <div class="headline-stat">
+        <div class="label" style="text-transform:none;" id="med-label">horas médicas usadas</div>
+        <div class="value" id="med-total">0<small>de 35 h</small></div>
+      </div>
+
+      <div class="stat-row">
+        <span class="label">Disponibles</span>
+        <span class="value" id="med-quedan">35 h</span>
+      </div>
+      <div class="stat-row" style="margin-bottom:26px;">
+        <span class="label">Visitas registradas</span>
+        <span class="value" id="med-visitas">0</span>
+      </div>
+
+      <section class="block">
+        <h2 id="med-form-title">Añadir horas médicas</h2>
+        <form class="entry" id="form-med">
+          <div class="field">
+            <label for="m-fecha">Fecha</label>
+            <input type="date" id="m-fecha" required style="width:152px;">
+          </div>
+          <div class="field">
+            <label for="m-horas">Horas</label>
+            <input type="number" id="m-horas" required min="0.25" max="24" step="0.25" inputmode="decimal" style="width:90px;">
+          </div>
+          <div class="field">
+            <label for="m-motivo">Motivo (opcional)</label>
+            <input type="text" id="m-motivo" maxlength="60" placeholder="Ej.: médico de cabecera" style="width:200px;">
+          </div>
+          <button type="submit" class="primary" id="med-submit">Guardar</button>
+          <button type="button" class="ghost" id="med-cancel" hidden>Cancelar</button>
+        </form>
+        <div class="form-msg" id="med-msg"></div>
+        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Por convenio corresponden 35 horas retribuidas al año para asistencia médica.</p>
+      </section>
+
+      <section class="block">
+        <h2>Horas usadas</h2>
+        <ul class="ledger" id="med-lista"></ul>
+      </section>
+    </section>
+
     <!-- EXPORTAR -->
     <section class="panel" id="panel-exportar">
       <section class="block">
         <h2>Exportar a Excel</h2>
-        <p class="export-copy">Descarga tus jornadas y vacaciones (disfrutadas y pendientes) en un archivo .xlsx, listo para abrir en Excel, Google Sheets o LibreOffice Calc.</p>
+        <p class="export-copy">Descarga tus jornadas, vacaciones y horas médicas en un archivo .xlsx, listo para abrir en Excel, Google Sheets o LibreOffice Calc.</p>
         <button class="primary" id="btn-exportar">Descargar registro (.xlsx)</button>
         <div class="export-status" id="export-status"></div>
       </section>
 
       <section class="block">
         <h2>Copia de seguridad (.json)</h2>
-        <p class="export-copy">Descarga una copia de tus jornadas y vacaciones para guardarla o pasarla a otro dispositivo.</p>
+        <p class="export-copy">Descarga una copia de tus jornadas, vacaciones y horas médicas para guardarla o pasarla a otro dispositivo.</p>
         <button class="ghost" id="btn-exportar-json">Descargar copia (.json)</button>
         <div class="export-status" id="export-json-status"></div>
       </section>
@@ -811,7 +862,7 @@
   // ---- LIMITES:INICIO ----
   // Límites aplicables: 1764 h/año, 48 h/semana, descanso de 3 días cada 15
   // o de 2 días por semana, y máximo 8 días seguidos de trabajo.
-  var LIM = { anual: 1764, semanal: 48, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8, vacaciones: 32 };
+  var LIM = { anual: 1764, semanal: 48, descansoQuincena: 3, descansoSemana: 2, rachaMax: 8, vacaciones: 32, medicas: 35 };
   var MES_ABR = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 
   function fmt(n) {
@@ -952,6 +1003,7 @@
     histYear: now.getFullYear(),
     histMonth: now.getMonth() + 1,
     estYear: now.getFullYear(),
+    medYear: now.getFullYear(),
     vacYear: now.getFullYear()
   };
 
@@ -964,6 +1016,7 @@
     historial: document.getElementById("panel-historial"),
     estadisticas: document.getElementById("panel-estadisticas"),
     vacaciones: document.getElementById("panel-vacaciones"),
+    medicas: document.getElementById("panel-medicas"),
     exportar: document.getElementById("panel-exportar")
   };
 
@@ -1180,6 +1233,157 @@
     if (avisos.length) {
       msg.className = "form-msg warn";
       msg.textContent = "Guardado, pero ojo: " + avisos.join("; ") + ".";
+    }
+  });
+
+  // ---------- Horas médicas ----------
+  var MED_KEY = "registro-jornada:medicas:v1";
+
+  function loadMed() {
+    try {
+      var parsed = JSON.parse(localStorage.getItem(MED_KEY) || "[]");
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+  function saveMed(list) {
+    try { localStorage.setItem(MED_KEY, JSON.stringify(list)); } catch (e) {}
+  }
+  var medicas = loadMed();
+  var medEditId = null;
+
+  function medDelAnio(year) {
+    return medicas
+      .filter(function (m) { return m.fecha.slice(0, 4) === String(year); })
+      .sort(function (a, b) { return a.fecha < b.fecha ? 1 : -1; });
+  }
+
+  function resetFormMed() {
+    medEditId = null;
+    document.getElementById("m-fecha").value = "";
+    document.getElementById("m-horas").value = "";
+    document.getElementById("m-motivo").value = "";
+    document.getElementById("med-submit").textContent = "Guardar";
+    document.getElementById("med-form-title").textContent = "Añadir horas médicas";
+    document.getElementById("med-cancel").hidden = true;
+  }
+
+  function startEditMed(m) {
+    medEditId = m.id;
+    document.getElementById("m-fecha").value = m.fecha;
+    document.getElementById("m-horas").value = m.horas;
+    document.getElementById("m-motivo").value = m.motivo || "";
+    document.getElementById("med-submit").textContent = "Actualizar";
+    document.getElementById("med-form-title").textContent = "Editar horas médicas";
+    document.getElementById("med-cancel").hidden = false;
+    document.getElementById("med-msg").textContent = "";
+    document.getElementById("m-fecha").focus();
+  }
+
+  function removeMed(id) {
+    var m = medicas.find(function (x) { return x.id === id; });
+    if (m && !window.confirm("¿Eliminar las horas médicas del " + formatFechaLarga(m.fecha) + "?")) return;
+    medicas = medicas.filter(function (x) { return x.id !== id; });
+    saveMed(medicas);
+    if (medEditId === id) resetFormMed();
+    renderMedicas();
+  }
+
+  function medItem(m) {
+    var li = document.createElement("li");
+
+    var fecha = document.createElement("span");
+    fecha.className = "fecha";
+    fecha.textContent = formatFechaLarga(m.fecha) + (m.motivo ? " · " + m.motivo : "");
+
+    var fill = document.createElement("span");
+    fill.className = "fill";
+
+    var horas = document.createElement("span");
+    horas.className = "horas";
+    horas.textContent = fmt(Number(m.horas)) + " h";
+
+    var actions = document.createElement("span");
+    actions.className = "actions";
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.setAttribute("aria-label", "Editar horas médicas del " + m.fecha);
+    editBtn.textContent = "✎";
+    editBtn.addEventListener("click", function () { startEditMed(m); });
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.setAttribute("aria-label", "Eliminar horas médicas del " + m.fecha);
+    delBtn.textContent = "✕";
+    delBtn.addEventListener("click", function () { removeMed(m.id); });
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+
+    li.appendChild(fecha);
+    li.appendChild(fill);
+    li.appendChild(horas);
+    li.appendChild(actions);
+    return li;
+  }
+
+  function renderMedicas() {
+    document.getElementById("med-anio").textContent = String(state.medYear);
+    var lista = medDelAnio(state.medYear);
+    var usadas = lista.reduce(function (s, m) { return s + Number(m.horas); }, 0);
+    var resto = LIM.medicas - usadas;
+
+    document.getElementById("med-label").textContent = "horas médicas usadas en " + state.medYear;
+    var elTotal = document.getElementById("med-total");
+    elTotal.innerHTML = fmt(usadas) + "<small>de " + LIM.medicas + " h</small>";
+    elTotal.style.color = resto < 0 ? "var(--danger)" : "";
+
+    document.getElementById("med-quedan").textContent = resto < 0 ? "Te pasas " + fmt(-resto) + " h" : fmt(resto) + " h";
+    document.getElementById("med-quedan").style.color = resto < 0 ? "var(--danger)" : "";
+    document.getElementById("med-visitas").textContent = String(lista.length);
+
+    var ul = document.getElementById("med-lista");
+    ul.innerHTML = "";
+    if (!lista.length) {
+      ul.innerHTML = '<li class="empty" style="border:none;">No hay horas médicas en ' + state.medYear + '.</li>';
+      return;
+    }
+    lista.forEach(function (m) { ul.appendChild(medItem(m)); });
+  }
+
+  document.getElementById("med-prev").addEventListener("click", function () { state.medYear--; renderMedicas(); });
+  document.getElementById("med-next").addEventListener("click", function () { state.medYear++; renderMedicas(); });
+  document.getElementById("med-cancel").addEventListener("click", function () {
+    document.getElementById("med-msg").textContent = "";
+    resetFormMed();
+  });
+
+  document.getElementById("form-med").addEventListener("submit", function (e) {
+    e.preventDefault();
+    var msg = document.getElementById("med-msg");
+    msg.textContent = "";
+    msg.className = "form-msg";
+
+    var fecha = document.getElementById("m-fecha").value;
+    var horas = parseFloat(document.getElementById("m-horas").value);
+    var motivo = document.getElementById("m-motivo").value.trim();
+
+    if (!fecha) { msg.textContent = "Indica la fecha."; return; }
+    if (!(horas > 0) || horas > 24) { msg.textContent = "Las horas deben estar entre 0,25 y 24."; return; }
+
+    if (medEditId) {
+      var idx = medicas.findIndex(function (o) { return o.id === medEditId; });
+      if (idx > -1) medicas[idx] = { id: medEditId, fecha: fecha, horas: horas, motivo: motivo };
+    } else {
+      medicas.push({ id: uid(), fecha: fecha, horas: horas, motivo: motivo });
+    }
+    saveMed(medicas);
+    var y = parseInt(fecha.slice(0, 4), 10);
+    state.medYear = y;
+    resetFormMed();
+    renderMedicas();
+
+    var totalY = medDelAnio(y).reduce(function (s, m) { return s + Number(m.horas); }, 0);
+    if (totalY > LIM.medicas) {
+      msg.className = "form-msg warn";
+      msg.textContent = "Guardado, pero ojo: en " + y + " llevas " + fmt(totalY) + " h (convenio: " + LIM.medicas + " h).";
     }
   });
 
@@ -1430,6 +1634,14 @@
       var wsV = XLSX.utils.json_to_sheet(filasVac);
       wsV["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 18 }, { wch: 16 }];
       XLSX.utils.book_append_sheet(wb, wsV, "Vacaciones");
+
+      var filasMed = medicas.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; }).map(function (m) {
+        return { Fecha: m.fecha, "Horas médicas": Number(m.horas), Motivo: m.motivo || "" };
+      });
+      if (!filasMed.length) filasMed = [{ Fecha: "", "Horas médicas": 0, Motivo: "" }];
+      var wsM = XLSX.utils.json_to_sheet(filasMed);
+      wsM["!cols"] = [{ wch: 14 }, { wch: 16 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, wsM, "Horas médicas");
       var wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       var blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
@@ -1475,7 +1687,8 @@
       var vacOrdenadas = vacaciones.slice().sort(function (a, b) { return a.desde < b.desde ? -1 : 1; });
       var data = JSON.stringify({
         jornadas: ordenadas.map(function (j) { return { fecha: j.fecha, horas: Number(j.horas) }; }),
-        vacaciones: vacOrdenadas.map(function (v) { return { desde: v.desde, hasta: v.hasta }; })
+        vacaciones: vacOrdenadas.map(function (v) { return { desde: v.desde, hasta: v.hasta }; }),
+        medicas: medicas.slice().sort(function (a, b) { return a.fecha < b.fecha ? -1 : 1; }).map(function (m) { return { fecha: m.fecha, horas: Number(m.horas), motivo: m.motivo || "" }; })
       }, null, 2);
       var blob = new Blob([data], { type: "application/json" });
       var filename = "copia_jornadas_" + todayISO() + ".json";
@@ -1596,6 +1809,23 @@
       saveVac(vacaciones);
     }
 
+    // Horas médicas incluidas en la copia (si las hay)
+    var medNuevas = 0;
+    if (parsed && Array.isArray(parsed.medicas)) {
+      if (reemplazar) medicas = [];
+      parsed.medicas.forEach(function (m) {
+        if (!m) return;
+        var f = normalizeFecha(m.fecha), h = parseFloat(m.horas);
+        if (!f || !(h > 0) || h > 24) return;
+        var mot = String(m.motivo || "").slice(0, 60);
+        var igual = medicas.some(function (o) { return o.fecha === f && Number(o.horas) === h && (o.motivo || "") === mot; });
+        if (igual) return;
+        medicas.push({ id: uid(), fecha: f, horas: h, motivo: mot });
+        medNuevas++;
+      });
+      saveMed(medicas);
+    }
+
     saveJornadas(jornadas);
     renderAll();
 
@@ -1604,6 +1834,7 @@
     if (actualizadas) partes.push(actualizadas + " actualizadas");
     if (omitidas) partes.push(omitidas + " omitidas por datos inválidos");
     if (vacNuevas) partes.push(vacNuevas + (vacNuevas === 1 ? " periodo de vacaciones" : " periodos de vacaciones"));
+    if (medNuevas) partes.push(medNuevas + (medNuevas === 1 ? " registro de horas médicas" : " registros de horas médicas"));
     var anioAct = now.getFullYear();
     status.textContent =
       (partes.length ? (reemplazar ? "Datos reemplazados: " : "") + partes.join(", ") + "." : "No se importó ninguna jornada.") +
@@ -1806,6 +2037,7 @@
     renderEstadisticas();
     renderEstLimites();
     renderVacaciones();
+    renderMedicas();
   }
 
   renderAll();
