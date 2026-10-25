@@ -697,7 +697,7 @@
           <button type="button" class="ghost" id="med-cancel" hidden>Cancelar</button>
         </form>
         <div class="form-msg" id="med-msg"></div>
-        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Por convenio corresponden 35 horas retribuidas al año para asistencia médica.</p>
+        <p class="export-copy" style="font-size:13px;margin:6px 0 0;">Por convenio corresponden 35 horas retribuidas al año. Cuentan dentro de la jornada máxima anual.</p>
       </section>
 
       <section class="block">
@@ -982,7 +982,7 @@
     if (hSem > LIM.semanal) {
       out.push("La semana del " + diaCorto(wsN) + " suma " + fmt(hSem) + " h (máximo " + LIM.semanal + " h).");
     }
-    var tot = totalAnio(list, parseInt(fecha.slice(0, 4), 10));
+    var tot = totalAnio(list, parseInt(fecha.slice(0, 4), 10)) + horasMedicasAnio(parseInt(fecha.slice(0, 4), 10));
     if (tot > LIM.anual) {
       out.push("Superas el máximo anual: " + fmt(tot) + " h de " + LIM.anual + " h.");
     }
@@ -1250,6 +1250,13 @@
   }
   var medicas = loadMed();
   var medEditId = null;
+
+  // Las horas médicas retribuidas computan dentro de la jornada máxima anual
+  function horasMedicasAnio(year) {
+    return medicas.reduce(function (t, m) {
+      return m.fecha.slice(0, 4) === String(year) ? t + Number(m.horas) : t;
+    }, 0);
+  }
 
   function medDelAnio(year) {
     return medicas
@@ -1903,7 +1910,8 @@
     var m = mapaDias(jornadas);
 
     // Horas del año
-    var total = totalAnio(jornadas, year);
+    var medAnio = horasMedicasAnio(year);
+    var total = totalAnio(jornadas, year) + medAnio;
     var quedan = LIM.anual - total;
     var hoyISO = todayISO();
     var previstas = 0;
@@ -1914,6 +1922,7 @@
     if (previstas > 0) {
       notaAnual = "Hechas hasta hoy: " + fmt(total - previstas) + " h. Previstas: " + fmt(previstas) + " h. " + notaAnual;
     }
+    if (medAnio > 0) notaAnual = "Incluye " + fmt(medAnio) + " h médicas. " + notaAnual;
     cont.appendChild(limitRow({
       name: "Horas del año " + year,
       val: fmt(total) + " de " + LIM.anual + " h",
@@ -1989,6 +1998,8 @@
     var cont = document.getElementById("est-limites");
     cont.innerHTML = "";
     var a = analizarAnio(jornadas, state.estYear);
+    var medAnio = horasMedicasAnio(state.estYear);
+    a.total += medAnio;
     var quedan = LIM.anual - a.total;
     var notaAnual = quedan >= 0 ? "Quedan " + fmt(quedan) + " h." : "Superas el máximo anual en " + fmt(-quedan) + " h.";
     if (state.estYear === now.getFullYear()) {
@@ -2001,6 +2012,7 @@
       }
     }
 
+    if (medAnio > 0) notaAnual = "Incluye " + fmt(medAnio) + " h médicas. " + notaAnual;
     cont.appendChild(limitRow({
       name: "Horas anuales",
       val: fmt(a.total) + " de " + LIM.anual + " h",
